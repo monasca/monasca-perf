@@ -60,13 +60,6 @@ class MetricPost():
         self.proc_num = str(proc_num)
         self.continuous = continuous
 
-    def doWorkContinuously_old(self):
-        while(True):
-            for x in xrange(num_requests):
-                status,response=self.postMetrics()
-                self.doSomethingWithResult(status,response)
-            time.sleep(interval)
-           
     def doWorkContinuously(self):
         while(True):
             start_send = time.time()
