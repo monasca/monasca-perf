@@ -7,6 +7,7 @@ import signal
 import simplejson
 import json
 import time
+from datetime import datetime
 import logging
 import logging.config
 
@@ -24,14 +25,14 @@ api_url = RNDD_KAFKA0002
 # on a single api server (with one ipaddress).  Would recommend not greater than 1000
 num_processes = 500
 
-# number of requests sent per interval (normally 1 if doing continuous)
-num_requests = 1
+# number of requests sent per interval (normally 1-20 max if doing continuous)
+num_requests = 4
 
 # the agent sends anywhere between 40-360 metrics per request
-num_metrics_per_request = 60
+num_metrics_per_request = 100
 
 # (for continuous) The seconds to wait to send metrics. valid range 1-60 (lowest recommended is 10 by the agent)
-interval = 10
+interval = 20
 
 # when False runs once, when True runs continuously sending num_requests every interval.
 continuous = False
@@ -46,7 +47,7 @@ print ("interval (secs) = %d" % interval)
 print ("total metrics sent (per interval) = %d" % (num_processes * num_requests * num_metrics_per_request))
 print ("total connections (per interval) = %d" % (num_processes * num_requests))
 
-headers = {"Content-type": "application/json", "X-Auth-Token": "2685f55a60324c2ca6b5b4407d52f39a"}
+headers = {"Content-type": "application/json", "X-Auth-Token": "12345678"}
 url = urlparse(api_url)
 processors = []  # global list to facilitate clean signal handling
 exiting = False
@@ -59,17 +60,37 @@ class MetricPost():
         self.proc_num = str(proc_num)
         self.continuous = continuous
 
-    def doWorkContinuously(self):
+    def doWorkContinuously_old(self):
         while(True):
             for x in xrange(num_requests):
                 status,response=self.postMetrics()
                 self.doSomethingWithResult(status,response)
             time.sleep(interval)
+           
+    def doWorkContinuously(self):
+        while(True):
+            start_send = time.time()
+            for x in xrange(num_requests):
+                status,response=self.postMetrics()
+                self.doSomethingWithResult(status,response)
+            end_send = time.time()
+            secs = end_send - start_send
+            if secs < interval:
+                sleep_interval = interval - secs
+            else: 
+                sleep_interval = 0
+                print ("send seconds %f took longer than interval %f, not sleeping" % (secs, interval))
+            #print ("send time = %f, sleep time = %f" % (secs, sleep_interval) )
+            time.sleep(sleep_interval)
                 
     def doWorkOnce(self):
+        start_send = time.time()
         for x in xrange(num_requests):
             status,response=self.postMetrics()
             self.doSomethingWithResult(status,response)
+        end_send = time.time()
+        secs = end_send - start_send
+        print ("send time in seconds = %f" % (secs))
 
     def postMetrics(self):
         try:
@@ -142,6 +163,8 @@ if __name__ == '__main__':
     ## Start
     try:
         log.info('Starting processes')
+        print ('Starting processes %s' % str(datetime.now()))
+        start = time.time()
         for process in processors:
             process.start()
 
@@ -153,8 +176,11 @@ if __name__ == '__main__':
         log.info('calling Process.join() ')
         for process in processors:
             process.join()
-
+        end = time.time()
+        print ("runtime = %d seconds" % (end - start))
     except Exception:
-        log.exception('Error! Exiting.')
+        print ('Error! Exiting.')
         for process in processors:
             process.terminate()
+        end = time.time()
+        print ("runtime = %d seconds" % (end - start))
