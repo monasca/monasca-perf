@@ -13,9 +13,7 @@ import logging.config
 
 # Run as "python agent_simulator.py
 
-RNDD_KAFKA0002 = 'http://15.184.17.107:8080/v2.0/metrics'
-RNDD_KAFKA0003 = 'http://15.184.4.176:8080/v2.0/metrics'
-RNDD_VIP = 'http://10.10.43.79:8080/v2.0/metrics'
+RNDD_KAFKA0002 = 'http://127.0.0.1:8080/v2.0/metrics'
 
 # select which API URL to use
 api_url = RNDD_KAFKA0002

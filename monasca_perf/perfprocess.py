@@ -17,7 +17,7 @@ print num_processes * num_threads * num_requests * num_metrics_per_request
 headers = {"Content-type": "application/json", "X-Auth-Token": "2685f55a60324c2ca6b5b4407d52f39a"}
 
 urls = [
-    'http://15.184.17.107:8080/v2.0/metrics',
+    'http://127.0.0.1:8080/v2.0/metrics',
 ]
 
 def doWork(q):
