@@ -6,8 +6,6 @@ import simplejson
 import time
 import base64
 
-#Run as "time python perfprocess.py > out 2>&1 &" then "tail -f out"
-
 num_processes = int(sys.argv[1])
 num_threads = int(sys.argv[2])
 num_requests = int(sys.argv[3])
@@ -15,8 +13,6 @@ num_metrics_per_request = int(sys.argv[4])
 series_name = sys.argv[5]
 username = sys.argv[6]
 password = sys.argv[7]
-#username = 'walk_testmetrics'
-#password = 'Magnan999!.'
 
 print num_processes * num_threads * num_requests * num_metrics_per_request
 
@@ -24,14 +20,10 @@ auth = base64.standard_b64encode('%s:%s' % (username,password)).replace('\n','')
 authorization = "Basic "
 authorization += auth
 headers = {"Content-type": "application/json", "X-Auth-Token": "2685f55a60324c2ca6b5b4407d52f39a", "Authorization": authorization }
-#headers = {"Content-type": "application/json", "X-Auth-Token": "2685f55a60324c2ca6b5b4407d52f39a"}
 
 urls = [
     'http://localhost:8086/db/testmetrics/series'
 ]
-    #'http://localhost:8086/db/testmetrics/series?u=walk_testmetrics&p=Magnan999!.'
-    #'http://15.184.4.155:8080/v2.0/metrics',
-    #'http://15.184.17.107:8080/v2.0/metrics',
 
 def doWork(q):
     url=q.get()

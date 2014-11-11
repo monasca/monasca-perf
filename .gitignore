@@ -6,6 +6,9 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+.DS_Store
+.project
+.pydevproject
 .Python
 env/
 build/
