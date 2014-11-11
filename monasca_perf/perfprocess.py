@@ -5,19 +5,19 @@ from Queue import Queue
 import simplejson
 import time
 
-#Run as "time python perfprocess.py > out" then "tail -f out"
+#Run as "time python perfprocess.py > out 2>&1 &" then "tail -f out"
 
-num_processes = 10
-num_threads = 200
-num_requests = 10
-num_metrics_per_request = 20
+num_processes = int(sys.argv[1])
+num_threads = int(sys.argv[2])
+num_requests = int(sys.argv[3])
+num_metrics_per_request = int(sys.argv[4])
 
 print num_processes * num_threads * num_requests * num_metrics_per_request
 
 headers = {"Content-type": "application/json", "X-Auth-Token": "2685f55a60324c2ca6b5b4407d52f39a"}
 
 urls = [
-    'http://127.0.0.1:8080/v2.0/metrics',
+    'http://localhost:8080/v2.0/metrics',
 ]
 
 def doWork(q):
