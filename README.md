@@ -24,3 +24,6 @@ influx_load.py - does a bunch of metric writes to an influx cluster
 
   time python influx_load.py  num_processes  num_threads  num_requests_per_thread  num_metrics_per_request  series_name  db_username  db_password
 
+influx_host_list.py - Lists the hosts with data stored on influxdb + handles agent amplification
+
+  python influx_host_list.py  dbusername  dbpassword  url
