@@ -1,4 +1,3 @@
-import simplejson as json
 import urllib, sys
 import re
 import base64
@@ -13,8 +12,10 @@ series_list = db.query('list series;')
 
 hosts = set()
 bad_series = 0
+total_series = 0
 hosts_amplified = set()
 for series in series_list[0]["points"]:
+    total_series += 1
     series_name = series[1]
     series_items = {}
     series_split = re.split(r'&',series_name)
@@ -23,7 +24,7 @@ for series in series_list[0]["points"]:
         try:
             series_items[series_name_item_split[0]] = series_name_item_split[1]
         except IndexError:
-            bad_series += 1
+            pass
     hostname = ""
     try:
         hostname = series_items['hostname']
@@ -32,6 +33,7 @@ for series in series_list[0]["points"]:
             hostname = series_items['instance_id']
         except KeyError:
             print series_name
+            bad_series += 1
             continue
     if len(hostname) == 0:
         print series_name
@@ -49,8 +51,14 @@ for series in series_list[0]["points"]:
     hosts_amplified.add(hostname)
     hosts_amplified.add(hostname_amplified)
 
-print "No host series: ", bad_series
-#print list(hosts)
+print
+print "Num no host series: ", bad_series
+for item in sorted(list(hosts)):
+    print item
 print "Num hosts: ", len(hosts)
-#print list(hosts_amplified)
+print
+for item in sorted(list(hosts_amplified)):
+    print item
 print "Num hosts + amplified: ", len(hosts_amplified)
+print
+print "Num total time series: ", total_series
