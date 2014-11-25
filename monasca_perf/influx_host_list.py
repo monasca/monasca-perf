@@ -36,6 +36,9 @@ for host in hosts_amplified.iterkeys():
     print(host)
 
 print("\nHosts in aw1 but not in the amplified list.")
+unamplified_count = 0
 for host in hosts:
     if not hosts_amplified.has_key(host) and host.find('aw1') != -1:
         print(host)
+        unamplified_count += 1
+print('Total unamplified %d' % unamplified_count)
