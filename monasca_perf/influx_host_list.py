@@ -12,10 +12,10 @@ db = influxdb.InfluxDBClient(url, 8086, username, password, 'mon')
 series_list = db.query('list series;')
 
 hosts = set()
+bad_series = 0
 hosts_amplified = set()
 for series in series_list[0]["points"]:
     series_name = series[1]
-    #print urllib.unquote(series_name).decode('utf8')
     series_items = {}
     series_split = re.split(r'&',series_name)
     for series_name_item in series_split:
@@ -23,7 +23,7 @@ for series in series_list[0]["points"]:
         try:
             series_items[series_name_item_split[0]] = series_name_item_split[1]
         except IndexError:
-            pass
+            bad_series += 1
     hostname = ""
     try:
         hostname = series_items['hostname']
@@ -48,14 +48,9 @@ for series in series_list[0]["points"]:
     hosts.add(hostname)
     hosts_amplified.add(hostname)
     hosts_amplified.add(hostname_amplified)
-#         if series_name_item_split[0] == 'hostname' or series_name_item_split[0] == 'instance_id':
-#             try:
-#                 #print series_name_item_split[1]
-#                 hosts.add(series_name_item_split[1])
-#                 break
-#             except IndexError:
-#                 print series_name
-print hosts
-print len(hosts)
-print hosts_amplified
-print len(hosts_amplified)
+
+print "No host series: ", bad_series
+#print list(hosts)
+print "Num hosts: ", len(hosts)
+#print list(hosts_amplified)
+print "Num hosts + amplified: ", len(hosts_amplified)
