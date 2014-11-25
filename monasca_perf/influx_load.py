@@ -19,7 +19,7 @@ print num_processes * num_threads * num_requests * num_metrics_per_request
 auth = base64.standard_b64encode('%s:%s' % (username,password)).replace('\n','')
 authorization = "Basic "
 authorization += auth
-headers = {"Content-type": "application/json", "X-Auth-Token": "2685f55a60324c2ca6b5b4407d52f39a", "Authorization": authorization }
+headers = {"Content-type": "application/json", "Authorization": authorization }
 
 urls = [
     'http://localhost:8086/db/testmetrics/series'
