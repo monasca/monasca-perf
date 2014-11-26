@@ -35,14 +35,14 @@ print('Total + amplified hosts = %d virtual hosts - caculated with amplification
 print('Found %d total metrics with %d metrics missing hostnames. Making an average %f metrics per host' %
       (total_metrics, metrics_missing_hostname, float(total_metrics)/virtual_hosts))
 
-#print("\nAmplified host list:")
-#for host in hosts_amplified.iterkeys():
-#    print(host)
-
 print("\nHosts in aw1 but not in the amplified list.")
 unamplified_count = 0
+not_fully_amplified_count = 0
 for host in hosts:
     if not hosts_amplified.has_key(host) and host.find('aw1') != -1:
         print(host)
         unamplified_count += 1
+    if hosts_amplified.has_key(host) and hosts_amplified[host] != amplification:
+        not_fully_amplified_count += 1
 print('Total unamplified %d' % unamplified_count)
+print('Total amplified but not at reported amplification (%d) = %d' % (amplification, not_fully_amplified_count))
