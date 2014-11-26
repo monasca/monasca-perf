@@ -24,7 +24,7 @@ for series in db.query('list series;')[0]["points"]:
 
     if series_items.has_key('amplifier'):  # I assume if it has a amplifier it has a hostname also
         hostname = series_items['hostname']
-        if not hosts_amplified.has_key(hostname) or hosts_amplified[hostname] < series_items['amplifier']:
+        if not hosts_amplified.has_key(hostname) or hosts_amplified[hostname] < int(series_items['amplifier']):
             hosts_amplified[hostname] = int(series_items['amplifier'])
 
 print('Found %d hosts' % len(hosts))
