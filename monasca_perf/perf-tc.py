@@ -11,6 +11,7 @@ it right now, but you could add like the 3.
 - all metric posts create a new time series based on a unique name
 - the default numbers simulate 10K agent nodes posting 100 metrics/agent node
 - added token retrieval from keystone, happens once for entire run
+- added timestamp to output
 """
 
 import httplib
@@ -18,7 +19,7 @@ import multiprocessing
 import sys
 import time
 import urlparse
-
+from datetime import datetime
 import simplejson
 
 from xml.etree.ElementTree import XML
@@ -28,6 +29,7 @@ num_requests = 100
 num_metrics_per_request = 100
 
 print "total: %s" % (num_processes*num_requests*num_metrics_per_request)
+print('Time Stamp %s' % str(datetime.now()))
 
 headers = {"Content-type": "application/json", "Accept": "application/json"}
 
