@@ -12,6 +12,7 @@ it right now, but you could add like the 3.
 - the default numbers simulate 10K agent nodes posting 100 metrics/agent node
 - added token retrieval from keystone, happens once for entire run
 - added timestamp to output
+- moved keystone to node 01 from 09
 """
 
 import httplib
@@ -39,7 +40,7 @@ urls = [
     'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0/metrics',
 ]
 
-keystone = 'http://10.22.156.19:35357/v3/auth/tokens'
+keystone = 'http://10.22.156.11:35357/v3/auth/tokens'
 
 def getToken():
         keyurl = urlparse.urlparse(keystone)
