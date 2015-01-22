@@ -13,6 +13,7 @@ it right now, but you could add like the 3.
 - added token retrieval from keystone, happens once for entire run
 - added timestamp to output
 - moved keystone to node 01 from 09
+- made metric body more realistic, added dimensions, simplified name 
 """
 
 import httplib
@@ -22,6 +23,7 @@ import time
 import urlparse
 from datetime import datetime
 import simplejson
+import hashlib
 
 from xml.etree.ElementTree import XML
 
@@ -82,8 +84,8 @@ def getStatus(ourl,id,x):
         body = []
         for i in xrange(num_metrics_per_request):
             epoch = (int)(time.time()) - 120
-            body.append({"name": "perf-tc-" + str(i) + "-" + str(x) + "-" + str(id),
-                         "dimensions": {"dim-1": "value-1"},
+            body.append({"name": "tc.test_perf_" + str(id),
+                         "dimensions": {"hostname": "foo-ae1test-bar" + str(x) + ".useast.hpcloud.net", "drive": "disk_" + str(i), "instance_id": hashlib.md5("tc.test_perf_" + str(id) + "foo-ae1test-bar" + str(x) + ".useast.hpcloud.net").hexdigest()},
                          "timestamp": epoch,
                          "value": i})
         body = simplejson.dumps(body)
