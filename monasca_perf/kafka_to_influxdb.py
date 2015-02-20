@@ -1,10 +1,9 @@
 __author__ = 'ryan'
 
-import httplib
 import json
 import multiprocessing
+import sys
 import time
-import urlparse
 import urllib
 
 import influxdb
@@ -16,7 +15,6 @@ num_processes = 1
 num_messages = 1
 
 max_wait_time = 20  # Seconds
-
 base_message = {
     "metric": {
         "name":"monasca.emit_time_sec",
