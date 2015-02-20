@@ -1,3 +1,5 @@
+import datetime
+import re
 import sys
 import time
 import multiprocessing
@@ -14,9 +16,12 @@ def no_warnings(message, category, filename, lineno):
     pass
 warnings.showwarning = no_warnings
 
+num_definitions = 4
 num_processes = 10
-num_requests = 1
+num_requests = 10
 num_metrics = 10
+
+max_wait_time = 20  # Seconds
 
 total_metrics = num_processes*num_requests*num_metrics
 
@@ -46,26 +51,28 @@ mysql_cfg = {
     'passwd': 'password',
     'db': 'mon'
 }
-# interval between prints of current values
-mysql_report_interval = 15  # Seconds
 
 metric_name = 'alarm_perf'
 metric_dimension = 'dim1'
 
 alarm_def_name = 'alarm_perf_test'
-alarm_def_expression = '{} > 0'.format(metric_name)
+alarm_def_expression = '{} > 0'
 
 def cleanup(monasca_client, name):
+    matched = 0
+    pattern = re.compile(metric_name+'[0-9]*')
     for definition in monasca_client.alarm_definitions.list():
-        if definition['name'] == name:
+        if pattern.match(definition['name']):
             monasca_client.alarm_definitions.delete(alarm_id=definition['id'])
+            matched += 1
+    print("Removed {} definitions".format(matched))
 
 
-def create_alarm_definition(monasca_client):
+def create_alarm_definition(monasca_client, name, expression):
     try:
         resp = monasca_client.alarm_definitions.create(
-            name=alarm_def_name,
-            expression=alarm_def_expression,
+            name=name,
+            expression=expression,
             match_by=[metric_dimension]
         )
         print('Alarm Definition ID: {}'.format(resp['id']))
@@ -75,8 +82,7 @@ def create_alarm_definition(monasca_client):
         return None
 
 
-def do_work(url_queue, sent_queue, proc_id, token):
-    url = url_queue.get()
+def do_work(url, sent_queue, proc_id, token):
     monasca_client = client.Client('2_0', url, token=token)
     start_num = (proc_id * num_requests * num_metrics)
     sent = 0
@@ -97,7 +103,7 @@ def create_metrics(monasca_client, id, start_number):
     body = []
     for i in xrange(num_metrics):
         body.append({
-            'name': metric_name,
+            'name': metric_name+str(id%num_definitions),
             'dimensions': {metric_dimension: 'value-{}'.format(start_number+i)},
             'value': 0,
             'timestamp': time.time()
@@ -134,24 +140,25 @@ def alarm_performance_test():
     # pause to allow thresh to complete internal cleanup of old alarms
     time.sleep(10)
 
-    print('Creating alarm definition')
-    alarm_def_id = create_alarm_definition(mon_client)
-    if not alarm_def_id:
-        return False
-
-    url_q = multiprocessing.Queue()
-    for i in xrange(num_processes):
-        url = urls[i % len(urls)]
-        url_q.put(url.strip())
+    print('Creating alarm definitions')
+    for i in range(0,num_definitions):
+        expression = alarm_def_expression.format(metric_name+str(i))
+        alarm_def_id = create_alarm_definition(mon_client, alarm_def_name+str(i), expression)
+        if not alarm_def_id:
+            return False
 
     sent_q = multiprocessing.Queue()
 
     print('Sending {} metrics'.format(total_metrics))
+    start_datetime = datetime.datetime.now()
+    start_datetime = start_datetime - datetime.timedelta(microseconds=start_datetime.microsecond)
+    start_datetime.strftime("%y-%m-%d %H:%M:%S")
     start_time = time.time()
 
     process_list = []
     for i in xrange(num_processes):
-        p = multiprocessing.Process(target=do_work, args=(url_q, sent_q, i, token))
+        p = multiprocessing.Process(target=do_work, args=(urls[i % len(urls)],
+                                                          sent_q, i, token))
         process_list.append(p)
         p.start()
 
@@ -172,29 +179,24 @@ def alarm_performance_test():
     print('Sent {} in {} seconds'.format(total_metrics_sent,final_time-start_time))
 
     print('Waiting for alarms to reach mySQL database')
-    alarms = 0
+    alarm_count = 0
     delta = 0
-    last_two = [-1,-1]
+    last_change = time.time()
     conn = _mysql.connect(**mysql_cfg)
-    while alarms < total_metrics_sent:
-        conn.query("select count(*) from alarm where alarm_definition_id=\"{}\";".format(alarm_def_id))
+    while alarm_count < total_metrics_sent:
+        conn.query("select count(*) from alarm where created_at >= \"{}\";".format(start_datetime))
         result = conn.store_result()
-        alarms = int(result.fetch_row()[0][0])
+        alarm_count = int(result.fetch_row()[0][0])
         delta = time.time() - start_time
-        if int(delta) % mysql_report_interval == 0:
-            print("{} of {} alarms in {} seconds".format(alarms, total_metrics_sent, delta))
-            if alarms == last_two[0] and last_two[0] == last_two[1]:
-                print("No change over {} seconds.".format(mysql_report_interval*2))
-                return False
-            else:
-                last_two[1] = last_two[0]
-                last_two[0] = alarms
+        if (last_change + max_wait_time) <= time.time():
+            print("Max wait time exceeded, {} alarms found".format(alarm_count))
+            return False
         time.sleep(1)
 
     conn.close()
     print("-----Test Results-----")
-    print("{} alarms in {} seconds".format(alarms, delta))
-    print("{} per second".format(alarms/delta))
+    print("{} alarms in {} seconds".format(alarm_count, delta))
+    print("{} per second".format(alarm_count/delta))
 
     if cleanup_after_test:
         cleanup(mon_client, alarm_def_name)
