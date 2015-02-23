@@ -42,7 +42,7 @@ urls = [
     'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0/metrics',
 ]
 
-keystone = 'http://10.22.156.11:35357/v3/auth/tokens'
+keystone = 'http://10.22.156.20:5001/v3/auth/tokens'
 
 def getToken():
         keyurl = urlparse.urlparse(keystone)
