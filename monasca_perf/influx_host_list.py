@@ -1,6 +1,5 @@
-import urllib, sys
-import re
-import base64
+#!/usr/bin/env python
+import sys
 from influxdb import client as influxdb
 
 username = sys.argv[1]
@@ -11,54 +10,40 @@ db = influxdb.InfluxDBClient(url, 8086, username, password, 'mon')
 series_list = db.query('list series;')
 
 hosts = set()
-bad_series = 0
-total_series = 0
-hosts_amplified = set()
-for series in series_list[0]["points"]:
-    total_series += 1
-    series_name = series[1]
-    series_items = {}
-    series_split = re.split(r'&',series_name)
-    for series_name_item in series_split:
-        series_name_item_split = re.split(r'=',series_name_item)
-        try:
-            series_items[series_name_item_split[0]] = series_name_item_split[1]
-        except IndexError:
-            pass
-    hostname = ""
-    try:
-        hostname = series_items['hostname']
-    except KeyError:
-        try:
-            hostname = series_items['instance_id']
-        except KeyError:
-            print series_name
-            bad_series += 1
-            continue
-    if len(hostname) == 0:
-        print series_name
-        continue
-    amplifier = ""
-    try:
-        amplifier = series_items['amplifier']
-    except KeyError:
-        pass
-    hostname_amplified = hostname
-    if len(amplifier) > 0:
-        hostname_amplified += ':amplifier:'
-        hostname_amplified += amplifier
-    hosts.add(hostname)
-    hosts_amplified.add(hostname)
-    hosts_amplified.add(hostname_amplified)
+hosts_amplified = {}
+total_metrics = 0
+metrics_missing_hostname = 0
+for series in db.query('list series;')[0]["points"]:
+    total_metrics += 1
+    entries = [entry for entry in series[1].split('&')]
+    series_items = {entry.split('=')[0]: entry.split('=')[1] for entry in entries if entry.find('=') != -1}
 
-print
-print "Num no host series: ", bad_series
-for item in sorted(list(hosts)):
-    print item
-print "Num hosts: ", len(hosts)
-print
-for item in sorted(list(hosts_amplified)):
-    print item
-print "Num hosts + amplified: ", len(hosts_amplified)
-print
-print "Num total time series: ", total_series
+    if series_items.has_key('hostname'):
+        hosts.add(series_items['hostname'])
+    else:
+        metrics_missing_hostname += 1
+
+    if series_items.has_key('amplifier'):  # I assume if it has a amplifier it has a hostname also
+        hostname = series_items['hostname']
+        if not hosts_amplified.has_key(hostname) or hosts_amplified[hostname] < int(series_items['amplifier']):
+            hosts_amplified[hostname] = int(series_items['amplifier'])
+
+print('Found %d hosts' % len(hosts))
+print('Found %d amplified hosts' % len(hosts_amplified))
+amplification = hosts_amplified[hosts_amplified.keys()[0]]
+virtual_hosts = len(hosts) + (amplification * len(hosts_amplified))
+print('Total + amplified hosts = %d virtual hosts - caculated with amplification %d' % (virtual_hosts, amplification))
+print('Found %d total metrics with %d metrics missing hostnames. Making an average %f metrics per host' %
+      (total_metrics, metrics_missing_hostname, float(total_metrics)/virtual_hosts))
+
+print("\nHosts in aw1 but not in the amplified list.")
+unamplified_count = 0
+not_fully_amplified_count = 0
+for host in hosts:
+    if not hosts_amplified.has_key(host) and host.find('aw1') != -1:
+        print(host)
+        unamplified_count += 1
+    if hosts_amplified.has_key(host) and hosts_amplified[host] != amplification:
+        not_fully_amplified_count += 1
+print('Total unamplified %d' % unamplified_count)
+print('Total amplified but not at reported amplification (%d) = %d' % (amplification, not_fully_amplified_count))
