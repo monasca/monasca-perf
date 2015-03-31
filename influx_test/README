@@ -1,0 +1,79 @@
+Monasca validation testing suite for InfluxDB.
+
+Setup
+-------------------------------------------
+
+You need to have the python module 'spur' installed.
+
+Create 3 cloud instances with floating ips. Install the version of InfluxDB to be tested 
+onto each instance. (Note: If installing ontop of a previous install, make sure you remove 
+the stuff in /tmp.) Edit the /etc/hosts file to add a section like:
+
+ex (influx9-1, etc is what shows up when running 'hostname':
+15.126.202.93 influx9-1
+15.126.222.57 influx9-2
+15.126.203.110 influx9-3
+
+Edit the /etc/opt/influxdb/influxdb.conf file for instances 2 & 3 to be pointing to instance 1.
+ex: 
+join-urls = "http://15.126.202.93:8086"
+
+Start up instance 1 and check the log in /var/log/influxdb/influxd.log. Then start up instance 2,
+then 3, each time verifying in the log that it connected. (0.9.0 doesn't have a cluster section in
+the admin screen, so you need to go by the logs.)
+
+It's probably a good idea to open an admin screen to each of the DB nodes, create a DB in one of 
+them, and then check the other 2 admin screens to verify it.
+
+NOTE: When upgrading from an older version of Influx, you need to stop the old version plus:
+sudo dkpg -r influxdb
+sudo rm -rf /tmp/influxdb
+sudo rm -rf /opt/influxdb
+Then you can (replace version in command):
+wget http://s3.amazonaws.com/influxdb/influxdb_0.9.0-rc16_amd64.deb
+sudo dpkg -i influxdb_0.9.0-rc16_amd64.deb   
+
+Running
+-------------------------------------------
+
+Run main.py with 3 args of the ips to the 3 instances, in order:
+ex:
+python main.py 15.126.202.93 15.126.222.57 15.126.203.110 --pem '/Users/todd/.ssh/testdefault.pem' --username ubuntu 
+
+Then run it. Results will be reported as tests are finished.
+
+NOTE: Some of the stuff I didn't get around to finishing yet. You currently must use --pem and --username.
+(It's typical to create new instances with a ssh key and just have ubuntu as the user.) The -r (range)
+operator isn't implemented yet either.
+
+Debugging the Results
+-------------------------------------------
+
+These are the places to look for results:
+1) Screen output 
+2) Influx admin screen (http://node1_ip:8083, root/root), database -> explore data, use 'select * from test_#'
+3) Influx log file in /var/log/influxdb on each instance
+4) Acceptance test debug output in /tmp on your local machine (this is very verbose)
+
+Use the '-t #' option to run the specific test number.
+
+A lot of things can potentially go wrong. This is a new framework that hasn't been run much yet
+(so it could be a test issue). New versions of influx are constantly coming out, some which break
+previously working things. There can be timing issues.
+
+Hand Debugging
+-------------------------------------------
+
+Create a DB:
+curl -G http://localhost:8086/query --data-urlencode "q=CREATE DATABASE mydb"
+Create the DB policy (necessary to have replication of 3):
+curl -G http://localhost:8086/query?pretty=true --data-urlencode "q=CREATE RETENTION POLICY mypolicy ON mydb DURATION 90d REPLICATION 3 DEFAULT"
+Post metric (change value to what's wanted):
+curl -X POST http://localhost:8086/write -d \' { "database": "mydb", "retentionPolicy": "mypolicy", "points": [ { "name": "mytsname", "fields": { "value": 1 ' } } ] }"
+List metrics for the time series (do count(*) for the count):
+curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=mydb" --data-urlencode "q=SELECT * FROM mytsname"
+
+
+
+
+
