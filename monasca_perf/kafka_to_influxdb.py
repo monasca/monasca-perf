@@ -1,10 +1,9 @@
 __author__ = 'ryan'
 
-import httplib
 import json
 import multiprocessing
+import sys
 import time
-import urlparse
 import urllib
 
 import influxdb
@@ -15,6 +14,7 @@ import kafka
 num_processes = 1
 num_messages = 1
 
+max_wait_time = 20  # Seconds
 base_message = {
     "metric": {
         "name":"monasca.emit_time_sec",
@@ -37,10 +37,15 @@ series = {
             "hostname":"devstack"}
 }
 
-influx_url = "http://192.168.10.4:8086/db/mon/series?u=root&p=root"
+influx_config = {
+    "ip": "192.168.10.4",
+    "port": 8086,
+    "username": "root",
+    "password": "root",
+    "database": "mon"
+}
 
 kafka_hosts = ['192.168.10.4:9092']
-#kafka_hosts = ['10.22.156.11:9092','10.22.156.12:9092','10.22.156.13:9092']
 kafka_topic = "metrics"
 
 
@@ -96,7 +101,7 @@ def kafka_to_influxdb_test():
                 pass
 
     except KeyboardInterrupt:
-        return 0
+        return False
 
     final_time = time.time()
     print("Sent {} in {} seconds".format(num_processes*num_messages, final_time-start_time))
@@ -106,27 +111,31 @@ def kafka_to_influxdb_test():
                                     series['metric_name'], series['metric_dimensions'])
     influx_query = "select count(value) from {} where time>{}".format(series_name, int(start_time*1000))
 
-    # query influxdb until metrics arrive
-    #url = urlparse.urlparse(influx_url)
-    #conn = httplib.HTTPConnection(url.netloc)
-    #count = 0
-    #query_url = influx_url + "&q=" + influx_query
-    #print(query_url)
-    #while count < num_processes*num_messages:
-    #    conn.request("GET", query_url)
-    #    res = conn.getresponse()
-    #    if res.status != 204:
-    #        raise Exception(res.status)
-    #    result = res.read()
-    #    result = json.loads(result)
-    #    print(result)
-    #    time.sleep(1)
-
-    client = influxdb.InfluxDBClient("192.168.10.4", 8086, "root", "root", "mon")
-    resp = client.query(influx_query)
-    count = resp[0]['points'][0][1]
+    count = 0
+    last_change = time.time()
+    while count < num_processes*num_messages:
+        client = influxdb.InfluxDBClient(influx_config['ip'],
+                                         influx_config['port'],
+                                         influx_config['username'],
+                                         influx_config['password'],
+                                         influx_config['database'])
+        resp = client.query(influx_query)
+        temp = count
+        count = resp[0]['points'][0][1]
+        if(temp != count):
+            last_change = time.time()
+        if (last_change + max_wait_time) <= time.time():
+            return False
+        time.sleep(1)
 
     final_time = time.time()
     print("{} metrics from influx in {} seconds".format(count, final_time-start_time))
+    return True
 
-kafka_to_influxdb_test()
+def main():
+    if not kafka_to_influxdb_test():
+        return 1
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

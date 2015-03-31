@@ -1,3 +1,6 @@
+# ADG 3/2015 - customized for test cluster baselline tests
+# ADG 3/2015 - modified to work with json object versus array response
+
 import datetime
 import re
 import sys
@@ -21,7 +24,7 @@ num_processes = 10
 num_requests = 10
 num_metrics = 10
 
-max_wait_time = 20  # Seconds
+max_wait_time = 200  # Seconds
 
 total_metrics = num_processes*num_requests*num_metrics
 
@@ -32,21 +35,18 @@ keystone = {
     'username': 'mini-mon',
     'password': 'password',
     'project': 'test',
-    #'auth_url': 'http://10.22.156.11:35357/v3',
-    'auth_url': 'http://192.168.10.5:35357/v3'
+    'auth_url': 'http://10.22.156.20:5001/v3'
 }
 
 # monasca api urls
 urls = [
-    #'https://mon-ae1test-monasca01.useast.hpcloud.net:8080/v2.0',
-    #'https://mon-ae1test-monasca02.useast.hpcloud.net:8080/v2.0',
-    #'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0',
-    'http://192.168.10.4:8080/v2.0',
+    'https://mon-ae1test-monasca01.useast.hpcloud.net:8080/v2.0',
+    'https://mon-ae1test-monasca02.useast.hpcloud.net:8080/v2.0',
+    'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0',
 ]
 
 mysql_cfg = {
-    #'host':'10.22.156.11',
-    'host': '192.168.10.4',
+    'host':'10.22.156.11',
     'user': 'monapi',
     'passwd': 'password',
     'db': 'mon'
@@ -61,7 +61,7 @@ alarm_def_expression = '{} > 0'
 def cleanup(monasca_client, name):
     matched = 0
     pattern = re.compile(metric_name+'[0-9]*')
-    for definition in monasca_client.alarm_definitions.list():
+    for definition in monasca_client.alarm_definitions.list()['elements']:
         if pattern.match(definition['name']):
             monasca_client.alarm_definitions.delete(alarm_id=definition['id'])
             matched += 1
@@ -104,9 +104,9 @@ def create_metrics(monasca_client, id, start_number):
     for i in xrange(num_metrics):
         body.append({
             'name': metric_name+str(id%num_definitions),
-            'dimensions': {metric_dimension: 'value-{}'.format(start_number+i)},
+            'dimensions': {metric_dimension: 'value-{}'.format(start_number+i), 'hostname': 'node' + str(i)},
             'value': 0,
-            'timestamp': time.time()
+            'timestamp': time.time()*1000
         })
     monasca_client.metrics.create(jsonbody=body)
 
