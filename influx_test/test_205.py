@@ -13,8 +13,8 @@ class test_205(TestBase):
             return ["FAIL","node 3 wrong count"]
         self.env.partitionStart(2)
         self.env.partitionStart(3)
-        self.env.fullPartitionNode(2)
-        self.env.fullPartitionNode(3)
+        self.env.fullyPartitionNode(2)
+        self.env.fullyPartitionNode(3)
         #These writes should all fail
         self.env.sendSingleMetric(1,self.name,4)
         self.env.sendSingleMetric(2,self.name,5)
@@ -24,11 +24,11 @@ class test_205(TestBase):
         self.env.sendSingleMetric(1,self.name,7)
         self.env.sendSingleMetric(2,self.name,8)
         self.env.sendSingleMetric(3,self.name,9)
-        if self.env.countMetrics(1,self.name) != 6:
+        if self.env.countMetrics(1,self.name) != 9:
             return ["FAIL","node 1 wrong count 2"]
-        if self.env.countMetrics(2,self.name) != 6:
+        if self.env.countMetrics(2,self.name) != 9:
             return ["FAIL","node 2 wrong count 2"]
-        if self.env.countMetrics(3,self.name) != 6:
+        if self.env.countMetrics(3,self.name) != 9:
             return ["FAIL","node 3 wrong count 2"]        
         return ["PASS",""]
     def desc(self):
