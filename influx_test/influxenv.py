@@ -16,7 +16,7 @@ class InfluxEnv(object):
             self.pem = pem
         self.datetime = time.strftime("%Y_%m_%dT%H_%M_%S", time.gmtime())
         self.db = 'run_' + self.datetime
-        logging.basicConfig(filename='/tmp/'+self.db+'.log',level=logging.INFO)
+        logging.basicConfig(filename='/tmp/'+self.db,level=logging.INFO)
         logging.info(self.db)
         logging.info("")
     def testLogBanner(self,test_name):
@@ -37,15 +37,15 @@ class InfluxEnv(object):
             #print result.output
         except spur.results.RunProcessError:
             pass
-        if len(result_text) > 0: logging.info(result_text)
+        logging.info("Result:"+result_text)
         time.sleep(pause)
         return result_text
     def stopInflux(self,node):
         logging.info("stopInflux")
-        self.executeCommand(node,["sudo","service","influxdb","stop"],5)
+        self.executeCommand(node,["sudo","service","influxdb","stop"],10)
     def startInflux(self,node):
         logging.info("startInflux")
-        self.executeCommand(node,["sudo","service","influxdb","start"],5)
+        self.executeCommand(node,["sudo","service","influxdb","start"],10)
     def killInflux(self,node):
         logging.info("killInflux")
         self.executeCommand(node,["sudo","pkill","influxdb"],1)
@@ -75,7 +75,12 @@ class InfluxEnv(object):
         self.executeCommand(node1,["sudo","ufw","deny","out","from",self.ip[node2],"to","any","port","8086"],2)
     def sendSingleMetric(self,node,tsname,value):
         logging.info("sendSingleMetric")
-        return self.executeCommand(node,["sh","-c",'curl -X POST http://localhost:8086/write -d \' { "database": "' + self.db + '", "retentionPolicy": "mypolicy", "points": [ { "name": "' + tsname + '", "fields": { "value": ' + str(value) + ' } } ] }\''],2)
+        for i in range(1,4):
+            result = self.executeCommand(node,["sh","-c",'curl -X POST http://localhost:8086/write -d \' { "database": "' + self.db + '", "retentionPolicy": "mypolicy", "points": [ { "name": "' + tsname + '", "fields": { "value": ' + str(value) + ' } } ] }\''],2)
+            if result.find("error") != -1:
+                time.sleep(10)
+                continue
+            break
     def sendMultipleMetrics(self,node,tsname,count):
         pass
     def listMetrics(self,node,tsname):
@@ -84,8 +89,8 @@ class InfluxEnv(object):
     def countMetrics(self,node,tsname):
         logging.info("countMetrics")
         result = self.executeCommand(node,["sh","-c",'curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=' + self.db + '" --data-urlencode "q=SELECT count(value) FROM ' + tsname + '"'],0)
-        if len(result) > 0: logging.info(result)
-        return json.loads(result)['results'][0]['series'][0]['values'][0][1]
+        j = json.loads(result)
+        return j['results'][0]['series'][0]['values'][0][1]
     def copyFile(self,node,filename):
         #shell = spur.SshShell(hostname=self.ip[node],username=self.username,private_key_file=self.pem)
         #with shell.open("/tmp","r") as remote_file

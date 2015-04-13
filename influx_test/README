@@ -42,9 +42,16 @@ python main.py 15.126.202.93 15.126.222.57 15.126.203.110 --pem '/Users/todd/.ss
 
 Then run it. Results will be reported as tests are finished.
 
+Other flags:
+
+Run a single test:
+-t test_number
+
+Run a range of tests:
+-r start:end
+
 NOTE: Some of the stuff I didn't get around to finishing yet. You currently must use --pem and --username.
-(It's typical to create new instances with a ssh key and just have ubuntu as the user.) The -r (range)
-operator isn't implemented yet either.
+(It's typical to create new instances with a ssh key and just have ubuntu as the user.) 
 
 Debugging the Results
 -------------------------------------------

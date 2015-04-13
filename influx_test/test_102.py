@@ -36,4 +36,4 @@ class test_102(TestBase):
             return ["FAIL","node 3 wrong count 6"]      
         return ["PASS",""]
     def desc(self):
-        return 'Shut down nodes 2 & 3. Fire off several different writes. Bring back up and query from thos nodes'
+        return 'Shut down nodes 2 & 3. Start up node 2. Write and test. Start up node 3. Write and test'

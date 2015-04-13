@@ -40,7 +40,13 @@ if __name__ == "__main__":
     else:
         test_list = [os.path.splitext(os.path.basename(x))[0] for x in glob.glob('test_*')]
     if args.range:
-        pass
+        test_range = args.range.split(":")
+        test_list2 = []
+        for x in test_list:
+            value = x.split("_")[1]
+            if value >= int(test_range[0]) and value <= int(test_range[1]):
+                test_list2.append(x)
+        test_list = test_list2
     for test_name in test_list:
         #make sure everything is started, because it could have died before
         env.testLogBanner(test_name)
