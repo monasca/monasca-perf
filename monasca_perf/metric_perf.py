@@ -20,6 +20,7 @@ num_requests = 4
 num_metrics = 100
 
 max_wait_time = 20  # Seconds
+DISTINCT_METRICS = 20
 
 keystone = {
     'username': 'mini-mon',
@@ -50,10 +51,9 @@ class MetricCreatorMetricPerf():
         self.num_calls = 0
 
     def create_metric(self):
-        metric = {"name": "metric_perf" + str(self.num_calls % num_metrics),
-                  "dimensions": {"dim1": "value-" + str(self.proc_num)},
-                  "timestamp": time.time()*1000 + self.num_calls, # make sure each timestamp is unique,
-                                                                  # else influx 9 will overwrite previous metric
+        metric = {"name": "metric_perf",
+                  "dimensions": {"dim1": "agent-" + str(self.proc_num)},
+                  "timestamp": time.time()*1000 + (self.num_calls % 1000), # timestamp must be unique
                   "value": 0}
         self.num_calls += 1
         return metric
@@ -117,14 +117,14 @@ def metric_performance_test():
     while metrics_found < total_metrics_sent:
 
         metrics_found = 0
-        for i in xrange(num_metrics):
-            try:
-                val = len(mon_client.metrics.list_measurements(start_time=start_datetime.isoformat(),
-                                                               name="metric_perf"+str(i),
-                                                               merge_metrics=True)[0]['measurements'])
-                metrics_found += val
-            except Exception as ex:
-                print("Failed to retrieve metrics from api\n{}".format(ex))
+        try:
+            stats = mon_client.metrics.list_statistics(statistics="count",
+                                                       start_time=start_datetime.isoformat(),
+                                                       name="metric_perf",
+                                                       merge_metrics=True)
+            metrics_found = stats[0]['statistics'][0][1]
+        except Exception as ex:
+            print("Failed to retrieve metrics from api\n{}".format(ex))
 
         if metrics_found > last_count:
             last_change = time.time()
