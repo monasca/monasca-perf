@@ -2,9 +2,16 @@ import time
 import spur
 import json
 import logging
+import pycurl
+import threading
+
+errorRetry = 10
+numThreads = 20
 
 class InfluxEnv(object):
     def __init__(self,ip1,ip2,ip3,username,pem):
+        self.errorRetry = errorRetry
+        self.numThreads = numThreads
         self.ip = [ "", ip1, ip2, ip3 ]
         if username is None:
             self.username = ""
@@ -42,10 +49,10 @@ class InfluxEnv(object):
         return result_text
     def stopInflux(self,node):
         logging.info("stopInflux")
-        self.executeCommand(node,["sudo","service","influxdb","stop"],10)
+        self.executeCommand(node,["sudo","service","influxdb","stop"],2)
     def startInflux(self,node):
         logging.info("startInflux")
-        self.executeCommand(node,["sudo","service","influxdb","start"],10)
+        self.executeCommand(node,["sudo","service","influxdb","start"],8)
     def killInflux(self,node):
         logging.info("killInflux")
         self.executeCommand(node,["sudo","pkill","influxdb"],1)
@@ -75,22 +82,45 @@ class InfluxEnv(object):
         self.executeCommand(node1,["sudo","ufw","deny","out","from",self.ip[node2],"to","any","port","8086"],2)
     def sendSingleMetric(self,node,tsname,value):
         logging.info("sendSingleMetric")
-        for i in range(1,4):
+        for i in range(0,self.errorRetry):
             result = self.executeCommand(node,["sh","-c",'curl -X POST http://localhost:8086/write -d \' { "database": "' + self.db + '", "retentionPolicy": "mypolicy", "points": [ { "name": "' + tsname + '", "fields": { "value": ' + str(value) + ' } } ] }\''],2)
             if result.find("error") != -1:
                 time.sleep(10)
                 continue
             break
+    def sendMultipleMetricsThread(self,url,payload,count):
+        for i in range(0,count):
+            c = pycurl.Curl()
+            c.setopt(pycurl.URL,url )
+            c.setopt(pycurl.HTTPHEADER, ['X-Postmark-Server-Token: API_TOKEN_HERE','Accept: application/json'])
+            c.setopt(pycurl.POST, 1)
+            c.setopt(pycurl.POSTFIELDS, payload)
+            c.perform()
     def sendMultipleMetrics(self,node,tsname,count):
-        pass
+        logging.info("sendMultipleMetrics")
+        payload = '{ "database": "' + self.db + '", "retentionPolicy": "mypolicy", "points": [ { "name": "' + tsname + '", "fields": { "value": -1 }}]}'
+        url = 'http://' + self.ip[node] + ':8086/write'
+        countForThread = int(count / self.numThreads)
+        threadList = []
+        for i in range(0,self.numThreads):
+            t = threading.Thread(target=self.sendMultipleMetricsThread, args=(url,payload,countForThread))
+            t.start()
+            threadList.append(t)
+        for t in threadList:
+            t.join()
     def listMetrics(self,node,tsname):
         logging.info("listMetrics")
         return self.executeCommand(node,["sh","-c",'curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=' + self.db + '" --data-urlencode "q=SELECT * FROM ' + tsname + '"'],0)
     def countMetrics(self,node,tsname):
         logging.info("countMetrics")
-        result = self.executeCommand(node,["sh","-c",'curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=' + self.db + '" --data-urlencode "q=SELECT count(value) FROM ' + tsname + '"'],0)
-        j = json.loads(result)
-        return j['results'][0]['series'][0]['values'][0][1]
+        for i in range(0,self.errorRetry):
+            result = self.executeCommand(node,["sh","-c",'curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=' + self.db + '" --data-urlencode "q=SELECT count(value) FROM ' + tsname + '"'],0)
+            if result.find("error") != -1:
+                time.sleep(10)
+                continue
+            j = json.loads(result)
+            return j['results'][0]['series'][0]['values'][0][1]
+        return -1  #bogus count value to indicate error
     def copyFile(self,node,filename):
         #shell = spur.SshShell(hostname=self.ip[node],username=self.username,private_key_file=self.pem)
         #with shell.open("/tmp","r") as remote_file

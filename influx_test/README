@@ -3,7 +3,7 @@ Monasca validation testing suite for InfluxDB.
 Setup
 -------------------------------------------
 
-You need to have the python module 'spur' installed.
+You need to have the python modules 'spur' and 'pycurl' installed.
 
 Create 3 cloud instances with floating ips. Install the version of InfluxDB to be tested 
 onto each instance. (Note: If installing ontop of a previous install, make sure you remove 
@@ -67,6 +67,11 @@ Use the '-t #' option to run the specific test number.
 A lot of things can potentially go wrong. This is a new framework that hasn't been run much yet
 (so it could be a test issue). New versions of influx are constantly coming out, some which break
 previously working things. There can be timing issues.
+
+So NOTE!: Just becasue you see a fail, it doesn't mean that this version of Influx is bad. The test suite will only
+do 3 retries for an Influx returned error. Therefore it can be a situation in which a returning node is coming back
+slowly and just throwing errors until it's fully back. You really need to look at the log files and run the test 
+individually to make sure.
 
 Hand Debugging
 -------------------------------------------

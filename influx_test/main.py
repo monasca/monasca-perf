@@ -5,6 +5,15 @@ import time
 import glob
 import os
 
+def resetState():
+    env.allPartitionStop()
+    env.stopInflux(3)
+    env.stopInflux(2)
+    env.stopInflux(1)
+    env.startInflux(1)
+    env.startInflux(2)
+    env.startInflux(3)
+
 
 #
 # Main Program
@@ -24,12 +33,7 @@ if __name__ == "__main__":
     env = influxenv.InfluxEnv(args.ip1,args.ip2,args.ip3,args.username,args.pemfile)
     #env.printDebug()
     
-    #make sure everything is started, because it could have died before
-    env.startInflux(1)
-    env.startInflux(2)
-    env.startInflux(3)
-    #make sure that there are no 'partitions'
-    env.allPartitionStop()
+    resetState()
     env.createDB()
     num_pass = 0
     num_fail = 0
@@ -43,20 +47,15 @@ if __name__ == "__main__":
         test_range = args.range.split(":")
         test_list2 = []
         for x in test_list:
-            value = x.split("_")[1]
+            value = int(x.split("_")[1])
             if value >= int(test_range[0]) and value <= int(test_range[1]):
                 test_list2.append(x)
         test_list = test_list2
     for test_name in test_list:
-        #make sure everything is started, because it could have died before
-        env.testLogBanner(test_name)
-        env.startInflux(1)
-        env.startInflux(2)
-        env.startInflux(3)
-        #make sure that there are no 'partitions'
-        env.allPartitionStop()
-        
         epoch_time = int(time.time())
+        env.testLogBanner(test_name)
+        resetState()
+        
         test_module = importlib.import_module(test_name)
         test = getattr(test_module,test_name)(env,test_name)
         test_result = test.run()
@@ -69,10 +68,7 @@ if __name__ == "__main__":
             print test_result[0] + " (" + test_result[1] +")" + ": " + test.name + " : " + test.desc() + " (" + str(test_time) + "s)"
             num_fail += 1
         
-    env.startInflux(1)
-    env.startInflux(2)
-    env.startInflux(3)
-    env.allPartitionStop()
+    resetState()
 
     print "Number of PASS:", num_pass
     print "Number of FAIL:", num_fail
