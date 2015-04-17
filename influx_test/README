@@ -33,6 +33,16 @@ Then you can (replace version in command):
 wget http://s3.amazonaws.com/influxdb/influxdb_0.9.0-rc16_amd64.deb
 sudo dpkg -i influxdb_0.9.0-rc16_amd64.deb   
 
+Test Groupings
+-------------------------------------------
+
+1-99 = Baseline tests (make sure cluster looks good)
+100-199 = Shut down Influx tests
+200-299 = Process kill Influx tests
+300-399 = Partition simulation (full, partial, uni-directional)
+1000-9999 = Functional tests
+10000+ = Load tests
+
 Running
 -------------------------------------------
 

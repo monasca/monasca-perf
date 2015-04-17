@@ -4,6 +4,7 @@ import json
 import logging
 import pycurl
 import threading
+from StringIO import StringIO
 
 errorRetry = 10
 numThreads = 20
@@ -90,12 +91,21 @@ class InfluxEnv(object):
             break
     def sendMultipleMetricsThread(self,url,payload,count):
         for i in range(0,count):
-            c = pycurl.Curl()
-            c.setopt(pycurl.URL,url )
-            c.setopt(pycurl.HTTPHEADER, ['X-Postmark-Server-Token: API_TOKEN_HERE','Accept: application/json'])
-            c.setopt(pycurl.POST, 1)
-            c.setopt(pycurl.POSTFIELDS, payload)
-            c.perform()
+            for j in range(0,self.errorRetry):
+                cbuffer = StringIO()
+                c = pycurl.Curl()
+                c.setopt(pycurl.URL,url )
+                c.setopt(pycurl.HTTPHEADER, ['X-Postmark-Server-Token: API_TOKEN_HERE','Accept: application/json'])
+                c.setopt(pycurl.POST, 1)
+                c.setopt(c.WRITEDATA, cbuffer)
+                c.setopt(pycurl.POSTFIELDS, payload)
+                c.perform()
+#                 if len(cbuffer.getvalue()) >0: print buffer.getvalue()
+                c.close()
+                if cbuffer.getvalue().find("error") != -1:
+                    time.sleep(1)
+                    continue
+                break
     def sendMultipleMetrics(self,node,tsname,count):
         logging.info("sendMultipleMetrics")
         payload = '{ "database": "' + self.db + '", "retentionPolicy": "mypolicy", "points": [ { "name": "' + tsname + '", "fields": { "value": -1 }}]}'
@@ -121,11 +131,11 @@ class InfluxEnv(object):
             j = json.loads(result)
             return j['results'][0]['series'][0]['values'][0][1]
         return -1  #bogus count value to indicate error
-    def copyFile(self,node,filename):
-        #shell = spur.SshShell(hostname=self.ip[node],username=self.username,private_key_file=self.pem)
-        #with shell.open("/tmp","r") as remote_file
-            #with open(".","w") as local_file
-                #shutil.copyfileobj(remote_file,local_file)
-        pass
+#     def copyFile(self,node,filename):
+#         shell = spur.SshShell(hostname=self.ip[node],username=self.username,private_key_file=self.pem)
+#         with shell.open("/tmp","r") as remote_file
+#             with open(".","w") as local_file
+#                 shutil.copyfileobj(remote_file,local_file)
+#         pass
     def printDebug(self):
         print self.ip[1],self.ip[2],self.ip[3],self.username,self.pem
