@@ -7,7 +7,8 @@ You need to have the python modules 'spur' and 'pycurl' installed.
 
 Create 3 cloud instances with floating ips. Install the version of InfluxDB to be tested 
 onto each instance. (Note: If installing ontop of a previous install, make sure you remove 
-the stuff in /tmp.) Edit the /etc/hosts file to add a section like:
+the stuff in /var/opt. Take a look at the update_influx.sh script.) Edit the /etc/hosts 
+file to add a section like:
 
 ex (influx9-1, etc is what shows up when running 'hostname':
 15.126.202.93 influx9-1
@@ -79,9 +80,9 @@ A lot of things can potentially go wrong. This is a new framework that hasn't be
 previously working things. There can be timing issues.
 
 So NOTE!: Just becasue you see a fail, it doesn't mean that this version of Influx is bad. The test suite will only
-do 3 retries for an Influx returned error. Therefore it can be a situation in which a returning node is coming back
-slowly and just throwing errors until it's fully back. You really need to look at the log files and run the test 
-individually to make sure.
+do a certain number of retries for an Influx returned error. Therefore it can be a situation in which a returning 
+node is coming back slowly and just throwing errors until it's fully back. You really need to look at the log 
+files and run the test individually to make sure.
 
 Hand Debugging
 -------------------------------------------
