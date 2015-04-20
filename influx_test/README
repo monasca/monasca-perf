@@ -38,8 +38,8 @@ Test Groupings
 
 1-99 = Baseline tests (make sure cluster looks good)
 100-199 = Shut down Influx tests
-200-299 = Process kill Influx tests
-300-399 = Partition simulation (full, partial, uni-directional)
+200-299 = Partition simulation (full, partial, uni-directional)
+300-399 = Process kill Influx tests
 1000-9999 = Functional tests
 10000+ = Load tests
 

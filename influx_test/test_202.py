@@ -29,4 +29,4 @@ class test_202(TestBase):
             return ["FAIL","node 3 wrong count 3"]        
         return ["PASS",""]
     def desc(self):
-        return 'Partitions node 3 away from node 2'
+        return 'Partition node 3 away from node 2'

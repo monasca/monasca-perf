@@ -6,7 +6,7 @@ import pycurl
 import threading
 from StringIO import StringIO
 
-errorRetry = 10
+errorRetry = 50
 numThreads = 20
 
 class InfluxEnv(object):
@@ -81,6 +81,9 @@ class InfluxEnv(object):
         #This is just between 2 nodes, not from everything
         self.executeCommand(node1,["sudo","ufw","deny","from",self.ip[node2],"to","any","port","8086"],2)
         self.executeCommand(node1,["sudo","ufw","deny","out","from",self.ip[node2],"to","any","port","8086"],2)
+    def unidirectionalSinglePartitionNode(self,node1,node2):
+        #This is just between 2 nodes, not from everything; unidirectional, node1 cannot receive from node2
+        self.executeCommand(node1,["sudo","ufw","deny","from",self.ip[node2],"to","any","port","8086"],2)
     def sendSingleMetric(self,node,tsname,value):
         logging.info("sendSingleMetric")
         for i in range(0,self.errorRetry):
@@ -103,6 +106,9 @@ class InfluxEnv(object):
 #                 if len(cbuffer.getvalue()) >0: print buffer.getvalue()
                 c.close()
                 if cbuffer.getvalue().find("error") != -1:
+#                     logging.info("sendMultipleMetricsThread: Error Retry "+j)
+                    if j >= self.errorRetry - 1:
+                        logging.info("sendMultipleMetricsThread: Max Error Retry Failure")
                     time.sleep(1)
                     continue
                 break

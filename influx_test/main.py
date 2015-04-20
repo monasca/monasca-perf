@@ -5,7 +5,7 @@ import time
 import glob
 import os
 
-def resetState():
+def resetState(env):
     env.allPartitionStop()
     env.stopInflux(3)
     env.stopInflux(2)
@@ -14,6 +14,12 @@ def resetState():
     env.startInflux(2)
     env.startInflux(3)
 
+def sortCmp(item1,item2):
+    item1int = int(item1.split("_")[1])
+    item2int = int(item2.split("_")[1])
+    if item1int < item2int: return -1
+    if item1int > item2int: return 1
+    return 0
 
 #
 # Main Program
@@ -33,7 +39,7 @@ if __name__ == "__main__":
     env = influxenv.InfluxEnv(args.ip1,args.ip2,args.ip3,args.username,args.pemfile)
     #env.printDebug()
     
-    resetState()
+    resetState(env)
     env.createDB()
     num_pass = 0
     num_fail = 0
@@ -51,10 +57,11 @@ if __name__ == "__main__":
             if value >= int(test_range[0]) and value <= int(test_range[1]):
                 test_list2.append(x)
         test_list = test_list2
+    test_list = sorted(test_list,cmp=sortCmp)
     for test_name in test_list:
         epoch_time = int(time.time())
         env.testLogBanner(test_name)
-        resetState()
+        resetState(env)
         
         test_module = importlib.import_module(test_name)
         test = getattr(test_module,test_name)(env,test_name)
@@ -68,7 +75,7 @@ if __name__ == "__main__":
             print test_result[0] + " (" + test_result[1] +")" + ": " + test.name + " : " + test.desc() + " (" + str(test_time) + "s)"
             num_fail += 1
         
-    resetState()
+    resetState(env)
 
     print "Number of PASS:", num_pass
     print "Number of FAIL:", num_fail
