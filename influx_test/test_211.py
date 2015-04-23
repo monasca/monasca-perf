@@ -30,4 +30,4 @@ class test_211(TestBase):
             return ["FAIL","node 3 wrong count 3"]        
         return ["PASS",""]
     def desc(self):
-        return 'Unidirectionally artition node 1 away from node 2 & 3'
+        return 'Unidirectionally partition node 1 away from node 2 & 3'
