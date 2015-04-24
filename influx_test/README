@@ -28,7 +28,7 @@ them, and then check the other 2 admin screens to verify it.
 
 NOTE: When upgrading from an older version of Influx, you need to stop the old version plus:
 sudo dkpg -r influxdb
-sudo rm -rf /tmp/influxdb
+sudo rm -rf /var/opt/influxdb
 sudo rm -rf /opt/influxdb
 Then you can (replace version in command):
 wget http://s3.amazonaws.com/influxdb/influxdb_0.9.0-rc16_amd64.deb
