@@ -30,13 +30,14 @@ if __name__ == "__main__":
     parser.add_argument("ip2", help="node 2 ip")
     parser.add_argument("ip3", help="node 3 ip")
     parser.add_argument("-u", "--username", help="username")
+    parser.add_argument("-p", "--password", help="password")
     parser.add_argument("-i", "--pemfile", help="pem file (path)")
     parser.add_argument("-t", "--test", help="run single test (number)")
     parser.add_argument("-r", "--range", help="run a range of tests (number:number)")
 
     args = parser.parse_args()
 
-    env = influxenv.InfluxEnv(args.ip1,args.ip2,args.ip3,args.username,args.pemfile)
+    env = influxenv.InfluxEnv(args.ip1,args.ip2,args.ip3,args.username,args.password,args.pemfile)
     #env.printDebug()
     
     resetState(env)

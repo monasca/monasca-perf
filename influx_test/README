@@ -69,7 +69,8 @@ Debugging the Results
 
 These are the places to look for results:
 1) Screen output 
-2) Influx admin screen (http://node1_ip:8083, root/root), database -> explore data, use 'select * from test_#'
+2) Influx admin screen (http://node1_ip:8083, root/root), database -> explore data, use 'select * from test_#' or
+   'select count(value) from test_#'
 3) Influx log file in /var/log/influxdb on each instance
 4) Acceptance test debug output in /tmp on your local machine (this is very verbose)
 

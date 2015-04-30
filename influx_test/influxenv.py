@@ -10,7 +10,7 @@ errorRetry = 50
 numThreads = 20
 
 class InfluxEnv(object):
-    def __init__(self,ip1,ip2,ip3,username,pem):
+    def __init__(self,ip1,ip2,ip3,username,password,pem):
         self.errorRetry = errorRetry
         self.numThreads = numThreads
         self.ip = [ "", ip1, ip2, ip3 ]
@@ -18,6 +18,10 @@ class InfluxEnv(object):
             self.username = ""
         else:
             self.username = username
+        if password is None:
+            self.password = ""
+        else:
+            self.password = password
         if pem is None:
             self.pem = ""
         else:
@@ -38,7 +42,10 @@ class InfluxEnv(object):
         logging.info(command)
         result_text = ""
         try:
-            shell = spur.SshShell(hostname=self.ip[node],username=self.username,private_key_file=self.pem)
+            if len(self.password) > 0:
+                shell = spur.SshShell(hostname=self.ip[node],username=self.username,password=self.password)
+            else:
+                shell = spur.SshShell(hostname=self.ip[node],username=self.username,private_key_file=self.pem)
             with shell:
                 result = shell.run(command)
                 result_text = result.output
@@ -144,4 +151,4 @@ class InfluxEnv(object):
 #                 shutil.copyfileobj(remote_file,local_file)
 #         pass
     def printDebug(self):
-        print self.ip[1],self.ip[2],self.ip[3],self.username,self.pem
+        print self.ip[1],self.ip[2],self.ip[3],self.username,self.password,self.pem
