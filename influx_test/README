@@ -55,6 +55,9 @@ Then run it. Results will be reported as tests are finished.
 
 Other flags:
 
+Use a password instead of a key/identify file:
+-p password
+
 Run a single test:
 -t test_number
 
