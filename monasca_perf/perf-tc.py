@@ -86,7 +86,7 @@ def getStatus(ourl,id,x):
             epoch = (int)(time.time()) - 120
             body.append({"name": "tc.test_perf_" + str(id),
                          "dimensions": {"hostname": "foo-ae1test-bar" + str(x) + ".useast.hpcloud.net", "drive": "disk_" + str(i), "instance_id": hashlib.md5("tc.test_perf_" + str(id) + "foo-ae1test-bar" + str(x) + ".useast.hpcloud.net").hexdigest()},
-                         "timestamp": epoch,
+                         "timestamp": epoch*1000,
                          "value": i})
         body = simplejson.dumps(body)
         conn.request("POST", url.path, body, tokenheaders)
