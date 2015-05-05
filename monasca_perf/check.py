@@ -4,9 +4,7 @@ import json
 import time
 
 # Use this when we get the ports open between the boxes
-hosts = ['mon-aw1rdd1-influxdb0001.rndd.aw1.hpcloud.net', 'mon-aw1rdd1-influxdb0002.rndd.aw1.hpcloud.net',
-         'mon-aw1rdd1-influxdb0003.rndd.aw1.hpcloud.net']
-hosts = ['mon-aw1rdd1-influxdb0003.rndd.aw1.hpcloud.net']
+hosts = ['mini-mon']
 
 counts = {}
 connections = [ (host, httplib.HTTPConnection(host, 8091)) for host in hosts]
@@ -27,7 +25,7 @@ while True:
         total = 0
         totalDelta = 0
         for i in range(0, 4):
-            name = 'monasca.persister.pipeline.event.MetricHandler[%d].metric-definition-dimensions-added-to-batch-counter' % i
+            name = 'monasca.persister.pipeline.event.MetricHandler[metric-%d].metrics-added-to-batch-counter' % i
             value = counters[name]['count']
             if i in counts[host]:
                 delta = value - counts[host][i]

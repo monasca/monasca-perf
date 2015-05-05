@@ -33,7 +33,7 @@ while True:
         total = 0
         totalDelta = 0
         for i in range(0, 4):
-            name = 'monasca.persister.pipeline.event.MetricHandler[%d].metrics-added-to-batch-counter' % i
+            name = 'monasca.persister.pipeline.event.MetricHandler[metric-%d].metrics-added-to-batch-counter' % i
             value = counters[name]['count']
             if i in counts[host]:
                 delta = value - counts[host][i]
