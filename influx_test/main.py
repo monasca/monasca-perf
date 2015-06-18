@@ -73,7 +73,7 @@ if __name__ == "__main__":
             print test_result[0] + ": " + test.name + " : " + test.desc() + " (" + str(test_time) + "s)"
             num_pass += 1
         else:
-            print test_result[0] + " (" + test_result[1] +")" + ": " + test.name + " : " + test.desc() + " (" + str(test_time) + "s)"
+            print test_result[0] + ": " + test.name + " (" + test_result[1] +")" + " : " + test.desc() + " (" + str(test_time) + "s)"
             num_fail += 1
         
     resetState(env)

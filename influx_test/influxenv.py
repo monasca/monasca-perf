@@ -8,11 +8,13 @@ from StringIO import StringIO
 
 errorRetry = 50
 numThreads = 20
+testDelayAdder = 10
 
 class InfluxEnv(object):
     def __init__(self,ip1,ip2,ip3,username,password,pem):
         self.errorRetry = errorRetry
         self.numThreads = numThreads
+        self.testDelayAdder = testDelayAdder
         self.ip = [ "", ip1, ip2, ip3 ]
         if username is None:
             self.username = ""
@@ -53,7 +55,7 @@ class InfluxEnv(object):
         except spur.results.RunProcessError:
             pass
         logging.info("Result:"+result_text)
-        time.sleep(pause)
+        time.sleep(pause+self.testDelayAdder)
         return result_text
     def stopInflux(self,node):
         logging.info("stopInflux")
