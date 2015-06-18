@@ -14,6 +14,11 @@ it right now, but you could add like the 3.
 - added timestamp to output
 - moved keystone to node 01 from 09
 - made metric body more realistic, added dimensions, simplified name 
+6/2015 Allan changes
+- modified for the CloudSystems env
+- made dimensions as close to real CS metrics as possible
+- by default, simulating 55K unique metrics to cover max CS load
+- prior to running script, replace keystone password with password from hosts file on CS Monasca control node(s)
 """
 
 import httplib
@@ -27,9 +32,11 @@ import hashlib
 
 from xml.etree.ElementTree import XML
 
-num_processes = 100
-num_requests = 100
-num_metrics_per_request = 100
+num_processes = 1
+#num_requests = 1
+#num_metrics_per_request = 1
+num_requests = 220 # i - number of agents
+num_metrics_per_request = 250 # x - number of metrics per agent
 
 print "total: %s" % (num_processes*num_requests*num_metrics_per_request)
 print('Time Stamp %s' % str(datetime.now()))
@@ -37,12 +44,10 @@ print('Time Stamp %s' % str(datetime.now()))
 headers = {"Content-type": "application/json", "Accept": "application/json"}
 
 urls = [
-    'https://mon-ae1test-monasca01.useast.hpcloud.net:8080/v2.0/metrics',
-    'https://mon-ae1test-monasca02.useast.hpcloud.net:8080/v2.0/metrics',
-    'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0/metrics',
+    'http://192.168.0.5:8080/v2.0/metrics'
 ]
 
-keystone = 'http://10.22.156.20:5001/v3/auth/tokens'
+keystone = 'http://192.168.0.20:5000/v3/auth/tokens'
 
 def getToken():
         keyurl = urlparse.urlparse(keystone)
@@ -52,15 +57,15 @@ def getToken():
           "methods": ["password"],
           "password": {
           "user": {
-          "name": "mini-mon",
+          "name": "monasca",
           "domain": { "id": "default" },
-          "password": "password"
+          "password": "538ac28040b1003fcaf259cb3c3fe51a2881a42b"
                   }
                       }
                       },
            "scope": {
            "project": {
-           "name": "test",
+           "name": "demo",
            "domain": { "id": "default" }
                       }
                     }
@@ -80,12 +85,12 @@ def doWork(url_queue, num_requests,id):
 def getStatus(ourl,id,x):
     try:
         url = urlparse.urlparse(ourl)
-        conn = httplib.HTTPSConnection(url.netloc)
+        conn = httplib.HTTPConnection(url.netloc)
         body = []
         for i in xrange(num_metrics_per_request):
             epoch = (int)(time.time()) - 120
-            body.append({"name": "tc.test_perf_" + str(id),
-                         "dimensions": {"hostname": "foo-ae1test-bar" + str(x) + ".useast.hpcloud.net", "drive": "disk_" + str(i), "instance_id": hashlib.md5("tc.test_perf_" + str(id) + "foo-ae1test-bar" + str(x) + ".useast.hpcloud.net").hexdigest()},
+            body.append({"name": "cs.test_perf_" + str(x),
+                         "dimensions": {"service": "monitoring", "hostname": "kvm" + str(i) + "-cn.veritas.local", "host_type": "compute_node", "role": "kvm", "device": "hw-" + str(i), "nova_id": str(i)},
                          "timestamp": epoch*1000,
                          "value": i})
         body = simplejson.dumps(body)
