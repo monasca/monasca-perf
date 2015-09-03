@@ -37,9 +37,9 @@ from xml.etree.ElementTree import XML
 num_processes = 1
 num_requests = 1
 num_metrics_per_request = 1
-#num_processes = 10
+#num_processes = 1
 #num_requests = 100 # i - number of agents
-#num_metrics_per_request = 100 # x - number of metrics per agent
+#num_metrics_per_request = 750 # x - number of metrics per agent
 
 print "total: %s" % (num_processes*num_requests*num_metrics_per_request)
 print('Time Stamp %s' % str(datetime.now()))
