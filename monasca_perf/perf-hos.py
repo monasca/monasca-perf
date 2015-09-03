@@ -35,11 +35,10 @@ import hashlib
 from xml.etree.ElementTree import XML
 
 num_processes = 1
-num_requests = 1
-num_metrics_per_request = 1
-#num_processes = 1
-#num_requests = 100 # i - number of agents
-#num_metrics_per_request = 750 # x - number of metrics per agent
+#num_requests = 1
+#num_metrics_per_request = 1
+num_requests = 100 # i - number of agents
+num_metrics_per_request = 750 # x - number of metrics per agent
 
 print "total: %s" % (num_processes*num_requests*num_metrics_per_request)
 print('Time Stamp %s' % str(datetime.now()))
@@ -47,10 +46,10 @@ print('Time Stamp %s' % str(datetime.now()))
 headers = {"Content-type": "application/json", "Accept": "application/json"}
 
 urls = [
-    'http://padawan-ccp-vip-MON-API-mgmt:8070/v2.0/metrics'
+    'http://hlm004-ccp-vip-MON-API-mgmt:8070/v2.0/metrics'
 ]
 
-keystone = 'http://padawan-ccp-vip-admin-KEY-API-mgmt:35357/v3/auth/tokens'
+keystone = 'http://hlm004-ccp-vip-admin-KEY-API-mgmt:35357/v3/auth/tokens'
 
 def getToken():
         keyurl = urlparse.urlparse(keystone)
@@ -93,7 +92,7 @@ def getStatus(ourl,id,x):
         for i in xrange(num_metrics_per_request):
             epoch = (int)(time.time()) - 120
             body.append({"name": "hos.test_perf_" + str(x),
-                         "dimensions": {"cluster": "compute", "hostname": "padawan-ccp-compute" + str(i) + "-mgmt", "control_plane": "ccp", "cloud_name": "padawan", "device": "hw-" + str(i)},
+                         "dimensions": {"cluster": "compute", "hostname": "hlm004-ccp-compute" + str(i) + "-mgmt", "control_plane": "ccp", "cloud_name": "hlm004", "device": "hw-" + str(i)},
                          "timestamp": epoch*1000,
                          "value": i})
         body = simplejson.dumps(body)
