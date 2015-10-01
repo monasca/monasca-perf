@@ -15,3 +15,8 @@ result = re.match("KiB Swap:.*?(\d+) cached", y)
 
 print result
 print result.group(1)
+
+x = "47163 dbadmin   20   0 15.816g 3.311g  40716 S   0.0  2.6 852:59.74 vertica"
+
+result = re.match(".*vertica$", x)
+print result

@@ -6,8 +6,18 @@ data = collections.OrderedDict()
 
 timestamp = ""
 
-user_match = ['kafka', 'mysql', 'dbadmin', 'zookeep+', 'mon-api',
-              'mon-per+', 'mon-not+', 'mon-age+']
+processes = {'kafka': {'cpu': [], 'mem': []},
+             'mysql': {'cpu': [], 'mem': []},
+             'dbadmin': {'cpu': [], 'mem': []},
+             'zookeep+': {'cpu': [], 'mem': []},
+             'mon-api': {'cpu': [], 'mem': []},
+             'mon-per+': {'cpu': [], 'mem': []}}
+
+
+# 'mon-not+': [],
+# 'mon-age+': []]
+
+match_processes = processes.keys()
 
 cpu = {'user': [],
        'sys': [],
@@ -51,18 +61,30 @@ with open(sys.argv[1], 'r') as f:
         if not line:
             continue
 
-        # result = re.match("top - (.*?) up", line)
-        # if result:
-        #    timestamp = result.group(1)
-        # else:
-        #   pid, user, _, _, virt, res, shr, _, cpu, mem, _, cmd = line.split()
+        result = re.match("^\s*\d", line)
+        if result:
+            pid, user, _, _, virt, res, shr, _, cpup, mem, _, cmd = line.split()
 
-            # if user in user_match:
-            #    match = [user, virt, res, cpu, mem, cmd]
-            #    print match
+            if user == "dbadmin":
+                result = re.match(".*vertica$", cmd)
+                if not result:
+                    continue
+            if user == "mysql":
+                result = re.match(".*mysqld$", cmd)
+                if not result:
+                    continue
+
+            if user in match_processes:
+                result = re.match("(.*?)g", res)
+                if result:
+                    res = float(result.group(1)) * 1024 * 1024
+                processes[user]['cpu'].append(float(cpup))
+                processes[user]['mem'].append(float(res))
 
 
 def avg(l):
+    if len(l) == 0:
+        return 0
     return round((sum(l) / len(l)), 2)
 
 
@@ -70,26 +92,26 @@ def build_avg_set(l):
     return [avg(l[x:x + samples_per_average]) for x in xrange(0, len(l), samples_per_average)]
 
 print("-- CPU ------------------------------")
-print("user: {}".format(build_avg_set(cpu['user'])))
-print("sys:  {}".format(build_avg_set(cpu['sys'])))
-print("idle: {}".format(build_avg_set(cpu['idle'])))
-print("wait: {}".format(build_avg_set(cpu['wait'])))
+print("user: {}%".format(avg(cpu['user'])))
+print("sys:  {}%".format(avg(cpu['sys'])))
+print("idle: {}%".format(avg(cpu['idle'])))
+print("wait: {}%".format(avg(cpu['wait'])))
 
-free = build_avg_set(memory['free'])
-buffers = build_avg_set(memory['buffers'])
-cache = build_avg_set(memory['cache'])
-
-used = []
-for f, b, c in zip(free, buffers, cache):
-    used.append(round((total_mem - (f + b + c)), 2))
-
-total_free = []
-for f, b, c in zip(free, buffers, cache):
-    total_free.append(round((f + b + c), 2))
+free = round(min(memory['free']), 2)
+buffers = round(min(memory['buffers']), 2)
+cache = round(min(memory['cache']), 2)
+used = round(total_mem - (free + buffers + cache), 2)
+total_free = round(free + buffers + cache, 2)
 
 print("-- MEM ------------------------------")
-print("used: {}".format(used))
-print("total_free: {}".format(total_free))
-print("free:  {}".format(build_avg_set(memory['free'])))
-print("buffers: {}".format(build_avg_set(memory['buffers'])))
-print("cache: {}".format(build_avg_set(memory['cache'])))
+print("max used: {}GB".format(used))
+print("min total_free: {}GB".format(total_free))
+print("min free:  {}GB".format(free))
+print("min buffers: {}GB".format(buffers))
+print("min cache: {}GB".format(cache))
+
+print("")
+print("{:<10}| {:^10}| {:^10}".format("process", "cpu", "mem"))
+print("--------------------------------------")
+for k, v in processes.iteritems():
+    print("{:<10}| {:^10}| {:^10}MB".format(k, avg(v['cpu']), round(max(v['mem']) / 1024, 2)))
