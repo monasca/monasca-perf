@@ -115,3 +115,9 @@ print("{:<10}| {:^10}| {:^10}".format("process", "cpu", "mem"))
 print("--------------------------------------")
 for k, v in processes.iteritems():
     print("{:<10}| {:^10}| {:^10}MB".format(k, avg(v['cpu']), round(max(v['mem']) / 1024, 2)))
+
+
+print "mysql: {}".format(build_avg_set(processes['mysql']['cpu']))
+print "kafka: {}".format(build_avg_set(processes['kafka']['cpu']))
+print "mon-per+: {}".format(build_avg_set(processes['mon-per+']['cpu']))
+print "mon-api: {}".format(build_avg_set(processes['mon-api']['cpu']))
