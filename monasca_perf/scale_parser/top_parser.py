@@ -12,6 +12,15 @@ processes['kafka'] = {'cpu': [], 'mem': []}
 processes['zookeep+'] = {'cpu': [], 'mem': []}
 processes['dbadmin'] = {'cpu': [], 'mem': []}
 processes['mysql'] = {'cpu': [], 'mem': []}
+processes['rabbitmq'] = {'cpu': [], 'mem': []}
+processes['elastic+'] = {'cpu': [], 'mem': []}
+processes['logstash'] = {'cpu': [], 'mem': []}
+processes['beaver'] = {'cpu': [], 'mem': []}
+processes['nova'] = {'cpu': [], 'mem': []}
+processes['neutron'] = {'cpu': [], 'mem': []}
+processes['cinder'] = {'cpu': [], 'mem': []}
+processes['glance'] = {'cpu': [], 'mem': []}
+processes['ceilome+'] = {'cpu': [], 'mem': []}
 
 match_processes = processes.keys()
 
@@ -88,6 +97,11 @@ def parse_top_file(path):
                     result = re.match("(.*?)g", res)
                     if result:
                         res = float(result.group(1)) * 1024 * 1024
+                    else:
+                        result = re.match("(.*?)t", res)
+                        if result:
+                            res = float(result.group(1)) * 1024 * 1024 * 1024
+
                     data_points = process_data.get(user, {'cpu': [], 'mem': []})
                     data_points['cpu'].append(float(cpup))
                     data_points['mem'].append(float(res))
