@@ -1,28 +1,25 @@
-import collections
 import re
 import sys
 
-processes = collections.OrderedDict()
-processes['mon-api'] = {'cpu': [], 'mem': []}
-processes['mon-per+'] = {'cpu': [], 'mem': []}
-processes['mon-age+'] = {'cpu': [], 'mem': []}
-processes['mon-not+'] = {'cpu': [], 'mem': []}
-processes['storm'] = {'cpu': [], 'mem': []}
-processes['kafka'] = {'cpu': [], 'mem': []}
-processes['zookeep+'] = {'cpu': [], 'mem': []}
-processes['dbadmin'] = {'cpu': [], 'mem': []}
-processes['mysql'] = {'cpu': [], 'mem': []}
-processes['rabbitmq'] = {'cpu': [], 'mem': []}
-processes['elastic+'] = {'cpu': [], 'mem': []}
-processes['logstash'] = {'cpu': [], 'mem': []}
-processes['beaver'] = {'cpu': [], 'mem': []}
-processes['nova'] = {'cpu': [], 'mem': []}
-processes['neutron'] = {'cpu': [], 'mem': []}
-processes['cinder'] = {'cpu': [], 'mem': []}
-processes['glance'] = {'cpu': [], 'mem': []}
-processes['ceilome+'] = {'cpu': [], 'mem': []}
+processes = ['mon-api',
+             'mon-per+',
+             'mon-age+',
+             'mon-not+',
+             'storm',
+             'kafka',
+             'zookeep+',
+             'dbadmin',
+             'mysql']
 
-match_processes = processes.keys()
+# 'rabbitmq'
+# 'elastic+'
+# 'logstash'
+# 'beaver'
+# 'nova'
+# 'neutron'
+# 'cinder'
+# 'glance'
+# 'ceilome+'
 
 cpu = {'user': [],
        'sys': [],
@@ -33,81 +30,9 @@ memory = {'free': [],
           'buffers': [],
           'cache': []}
 
-samples_per_average = int(sys.argv[2])
-total_mem = 125
-
-
-def aggregate_process_data(process_data):
-    for k, v in process_data.iteritems():
-        processes[k]['cpu'].append(sum(v['cpu']))
-        processes[k]['mem'].append(sum(v['mem']))
-
-
-def parse_top_file(path):
-    process_data = {}
-    with open(path, 'r') as f:
-        for line in f:
-            line = line.rstrip()
-
-            if not line:
-                continue
-
-            result = re.match("top -", line)
-            if result:
-                aggregate_process_data(process_data)
-                process_data = {}
-
-            result = re.match("Tasks:", line)
-            if result:
-                continue
-
-            result = re.match("%Cpu.*?(\d+.\d+) us.*?(\d+.\d+) sy.*?(\d+.\d+) id.*?(\d+.\d+) wa", line)
-            if result:
-                cpu['user'].append(float(result.group(1)))
-                cpu['sys'].append(float(result.group(2)))
-                cpu['idle'].append(float(result.group(3)))
-                cpu['wait'].append(float(result.group(4)))
-                continue
-
-            result = re.match("KiB Mem:.*?(\d+) free.*?(\d+) buffers", line)
-            if result:
-                memory['free'].append(float(result.group(1)) / 1024 / 1024)
-                memory['buffers'].append(float(result.group(2)) / 1024 / 1024)
-                continue
-
-            result = re.match("KiB Swap:.*?(\d+) cached", line)
-            if result:
-                memory['cache'].append(float(result.group(1)) / 1024 / 1024)
-                continue
-
-            result = re.match("^\s*\d", line)
-            if result:
-                pid, user, _, _, virt, res, shr, _, cpup, mem, _, cmd = line.split()
-
-                if user == "dbadmin":
-                    result = re.match(".*vertica$", cmd)
-                    if not result:
-                        continue
-                if user == "mysql":
-                    result = re.match(".*mysqld$", cmd)
-                    if not result:
-                        continue
-
-                if user in match_processes:
-                    result = re.match("(.*?)g", res)
-                    if result:
-                        res = float(result.group(1)) * 1024 * 1024
-                    else:
-                        result = re.match("(.*?)t", res)
-                        if result:
-                            res = float(result.group(1)) * 1024 * 1024 * 1024
-
-                    data_points = process_data.get(user, {'cpu': [], 'mem': []})
-                    data_points['cpu'].append(float(cpup))
-                    data_points['mem'].append(float(res))
-                    process_data[user] = data_points
-        else:
-            aggregate_process_data(process_data)
+# samples_per_average = int(sys.argv[2])
+samples_per_average = 60
+system_memory = 125
 
 
 def avg(l):
@@ -119,38 +44,165 @@ def avg(l):
 def build_avg_set(l):
     return [avg(l[x:x + samples_per_average]) for x in xrange(0, len(l), samples_per_average)]
 
-parse_top_file(sys.argv[1])
 
-print("-- CPU ------------------------------")
-print("user: {}%".format(avg(cpu['user'])))
-print("sys:  {}%".format(avg(cpu['sys'])))
-print("idle: {}%".format(avg(cpu['idle'])))
-print("wait: {}%".format(avg(cpu['wait'])))
+def min_free(node):
+    free = min(node['system_mem']['free'])
+    buffers = min(node['system_mem']['buffers'])
+    cache = min(node['system_mem']['cache'])
+    return free + buffers + cache
 
-free = round(min(memory['free']), 2)
-buffers = round(min(memory['buffers']), 2)
-cache = round(min(memory['cache']), 2)
-used = round(total_mem - (free + buffers + cache), 2)
-total_free = round(free + buffers + cache, 2)
 
-print("-- MEM ------------------------------")
-print("max used: {}GB".format(used))
-print("min total_free: {}GB".format(total_free))
-print("min free:  {}GB".format(free))
-print("min buffers: {}GB".format(buffers))
-print("min cache: {}GB".format(cache))
+def max_used(node):
+    return system_memory - min_free(node)
 
-print("")
-print("{:<10}| {:^8} | {:^8}".format("process", "cpu", "mem"))
-print("--------------------------------------")
-total_cpu = []
-total_mem = []
-for k, v in processes.iteritems():
-    total_cpu.append(avg(v['cpu']))
-    total_mem.append(max(v['mem']) / 1024)
-    print("{:<10}| {:>8.2f} | {:>8.2f}MB".format(k, avg(v['cpu']), round(max(v['mem']) / 1024, 2)))
-print("--------------------------------------")
-print("{:<10}| {:>8.2f} | {:>8.2f}MB".format('total', sum(total_cpu), sum(total_mem)))
+
+def normalize_memory(mem):
+    result = re.match("(.*?)m", mem)
+    if result:
+        return float(result.group(1)) * 1024
+
+    result = re.match("(.*?)g", mem)
+    if result:
+        return float(result.group(1)) * 1024 * 1024
+
+    result = re.match("(.*?)t", mem)
+    if result:
+        return float(result.group(1)) * 1024 * 1024 * 1024
+
+    return mem
+
+
+def aggregate_process_data(node_data, process_data):
+    for k, v in process_data.iteritems():
+        data = node_data.get(k, {'cpu': [], 'mem': []})
+        data['cpu'].append(sum(v['cpu']))
+        data['mem'].append(sum(v['mem']))
+        node_data[k] = data
+
+
+def parse_top_file(path):
+    node_data = {'system_cpu': {'user': [],
+                                'sys': [],
+                                'idle': [],
+                                'wait': []},
+                 'system_mem': {'free': [],
+                                'buffers': [],
+                                'cache': []}}
+
+    process_data = {}
+    with open(path, 'r') as f:
+        for line in f:
+            line = line.rstrip()
+
+            if not line:
+                continue
+
+            result = re.match("top -", line)
+            if result:
+                aggregate_process_data(node_data, process_data)
+                process_data = {}
+
+            result = re.match("Tasks:", line)
+            if result:
+                continue
+
+            result = re.match("%Cpu.*?(\d+.\d+) us.*?(\d+.\d+) sy.*?(\d+.\d+) id.*?(\d+.\d+) wa", line)
+            if result:
+                node_data['system_cpu']['user'].append(float(result.group(1)))
+                node_data['system_cpu']['sys'].append(float(result.group(2)))
+                node_data['system_cpu']['idle'].append(float(result.group(3)))
+                node_data['system_cpu']['wait'].append(float(result.group(4)))
+                continue
+
+            result = re.match("KiB Mem:.*?(\d+) free.*?(\d+) buffers", line)
+            if result:
+                node_data['system_mem']['free'].append(float(result.group(1)) / 1024 / 1024)
+                node_data['system_mem']['buffers'].append(float(result.group(2)) / 1024 / 1024)
+                continue
+
+            result = re.match("KiB Swap:.*?(\d+) cached", line)
+            if result:
+                node_data['system_mem']['cache'].append(float(result.group(1)) / 1024 / 1024)
+                continue
+
+            result = re.match("^\s*\d", line)
+            if result:
+                pid, user, _, _, virt, res, shr, _, cpup, mem, _, cmd = line.split()
+
+                if user in processes:
+                    res = normalize_memory(res)
+                    data_points = process_data.get(user, {'cpu': [], 'mem': []})
+                    data_points['cpu'].append(float(cpup))
+                    data_points['mem'].append(float(res))
+                    process_data[user] = data_points
+        else:
+            aggregate_process_data(node_data, process_data)
+
+    return node_data
+
+
+def generate_report(node1, node2, node3):
+    print("{:<10}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
+    print("------------------------------------------")
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
+          avg(node1['system_cpu']['idle']),
+          avg(node2['system_cpu']['idle']),
+          avg(node3['system_cpu']['idle'])))
+
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
+          min_free(node1),
+          min_free(node2),
+          min_free(node3)))
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
+          max_used(node1),
+          max_used(node2),
+          max_used(node3)))
+
+    print("")
+    print("{:<10}| {:^8} | {:^8} | {:^8}".format("CPU", "Node 1", "Node 2", "Node 3"))
+    print("------------------------------------------")
+    total_cpu = {'node1': [], 'node2': [], 'node3': []}
+    for k in processes:
+        n1 = avg(node1[k]['cpu'])
+        n2 = avg(node2[k]['cpu'])
+        n3 = avg(node3[k]['cpu'])
+        total_cpu['node1'].append(n1)
+        total_cpu['node2'].append(n2)
+        total_cpu['node3'].append(n3)
+        print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(k, n1, n2, n3))
+
+    print("------------------------------------------")
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:8.2f}"
+          .format('total',
+                  sum(total_cpu['node1']),
+                  sum(total_cpu['node2']),
+                  sum(total_cpu['node3'])))
+
+    print("")
+    print("{:<10}| {:^8} | {:^8} | {:^8}".format("MEM", "Node 1", "Node 2", "Node 3"))
+    print("------------------------------------------")
+    total_mem = {'node1': [], 'node2': [], 'node3': []}
+    for k in processes:
+        total_mem['node1'].append(max(node1[k]['mem']))
+        total_mem['node2'].append(max(node2[k]['mem']))
+        total_mem['node3'].append(max(node3[k]['mem']))
+        print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}"
+              .format(k,
+                      max(node1[k]['mem']) / 1024,
+                      max(node2[k]['mem']) / 1024,
+                      max(node3[k]['mem']) / 1024))
+
+    print("------------------------------------------")
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:8.2f}"
+          .format('total',
+                  sum(total_mem['node1']) / 1024,
+                  sum(total_mem['node2']) / 1024,
+                  sum(total_mem['node3']) / 1024))
+
+
+generate_report(parse_top_file(sys.argv[1] + '/node1/' + sys.argv[2] + '/system.top'),
+                parse_top_file(sys.argv[1] + '/node2/' + sys.argv[2] + '/system.top'),
+                parse_top_file(sys.argv[1] + '/node3/' + sys.argv[2] + '/system.top'))
 
 
 # print "mysql: {}".format(build_avg_set(processes['mysql']['cpu']))
