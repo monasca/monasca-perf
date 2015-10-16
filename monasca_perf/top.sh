@@ -1,3 +1,3 @@
 #!/bin/bash
 
-top -b -d 1 > system.top
+top -b -d 1 > $1
