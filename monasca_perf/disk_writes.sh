@@ -2,7 +2,7 @@
 
 while :
 do
-	date >> iostat_metrics
-	iostat >> iostat_metrics
+	date >> $1
+	iostat >> $1
 	sleep 15
 done
