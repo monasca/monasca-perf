@@ -24,8 +24,8 @@ from monascaclient import client as monasca_client
 
 import numpy as np
 
-#AUTH_URL = 'http://192.168.10.5:35357/v3'
-AUTH_URL = 'http://127.0.0.1:35357/v3'
+AUTH_URL = 'http://192.168.10.5:35357/v3'
+#AUTH_URL = 'http://127.0.0.1:35357/v3'
 USERNAME = 'mini-mon'
 PASSWORD = 'password'
 DOMAIN_NAME = 'Default'
@@ -185,13 +185,9 @@ while True:
         last_collection_time = current_time
 
     alarms = get_alarms(monasca_client)
-    for alarm in alarms:
-        if alarm['state'] == 'ALARM':
-            id = get_metric_id(alarm)
-            if end_transition_times[id] == None:
-                end_transition_times[id] = time.time()
-
     transitioned = map(lambda x: x['state'] == 'ALARM', alarms)
+    end_transition_times = map(lambda x, y: time.time() if x and y == None else y,
+                               transitioned, end_transition_times)
     all_transitioned = reduce(lambda x, y: x & y, transitioned)
 
     if all_transitioned:
@@ -212,3 +208,5 @@ std = np.std(elapsed_times)
 logger.info('mean: %f' % mean)
 logger.info('median: %f' % median)
 logger.info('std: %f' % std)
+
+print elapsed_times
