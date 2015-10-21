@@ -4,6 +4,7 @@ import multiprocessing
 import random
 import argparse
 
+from monascaclient.common import utils
 from monascaclient import client
 from monascaclient import ksclient
 
@@ -11,10 +12,20 @@ max_wait_time = 20
 min_wait_time = 5
 
 keystone = {
-    'username': 'mini-mon',
-    'password': 'password',
-    'project': 'test',
-    'auth_url': 'http://192.168.10.5:35357/v3'
+    'username': utils.env('OS_USERNAME'),
+    'password': utils.env('OS_PASSWORD'),
+    'token': utils.env('OS_AUTH_TOKEN'),
+    'auth_url': utils.env('OS_AUTH_URL'),
+    'service_type': utils.env('OS_SERVICE_TYPE'),
+    'endpoint_type': utils.env('OS_ENDPOINT_TYPE'),
+    'os_cacert': utils.env('OS_CACERT'),
+    'user_domain_id': utils.env('OS_USER_DOMAIN_ID'),
+    'user_domain_name': utils.env('OS_USER_DOMAIN_NAME'),
+    'project_id': utils.env('OS_PROJECT_ID'),
+    'project_name': utils.env('OS_PROJECT_NAME'),
+    'domain_id': utils.env('OS_DOMAIN_ID'),
+    'domain_name': utils.env('OS_DOMAIN_NAME'),
+    'region_name': utils.env('OS_REGION_NAME')
 }
 
 # monasca api urls

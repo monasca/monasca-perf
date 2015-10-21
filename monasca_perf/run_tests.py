@@ -1,7 +1,7 @@
 import subprocess
 import sys
 import argparse
-import psutil
+import datetime
 
 # Available tests
 # Disk.sh to check initial and final disk
@@ -31,6 +31,8 @@ def parse_args():
 
 def main():
 
+    start_time = datetime.datetime.utcnow().isoformat()
+
     args = parse_args()
 
     with open(args.output_directory + 'initial_disk', "w") as stdout:
@@ -40,6 +42,12 @@ def main():
     disk_process = subprocess.Popen("exec ./disk_writes.sh " + args.output_directory + 'disk_io', shell=True)
     top_process = subprocess.Popen("exec ./top.sh " + args.output_directory + 'system_info', shell=True)
 
+    if args.query_api:
+        subprocess.Popen("python query_alarms.py", shell=True)
+    if args.query_alarm_state:
+        subprocess.Popen("python query_alarm_state.py --output_directory " +
+                                                     args.output_directory, shell=True)
+
     try:
         kafka_process.wait()
     except KeyboardInterrupt:
@@ -48,6 +56,9 @@ def main():
         kafka_process.kill()
         disk_process.kill()
         top_process.kill()
+        if args.query_metrics_per_second:
+            subprocess.call("python query_metrics_per_second.py " + start_time + " --output_directory " +
+                            args.output_directory, shell=True)
 
 if __name__ == "__main__":
     sys.exit(main())
