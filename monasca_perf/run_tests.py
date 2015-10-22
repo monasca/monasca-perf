@@ -46,7 +46,7 @@ def main():
     top_process = subprocess.Popen("exec ./top.sh " + args.output_directory + 'system_info', shell=True)
 
     if args.query_alarm_transitions:
-        alarm_transitions_process = subprocess.Popen("exec ./alarm_transitions " + args.output_directory +
+        alarm_transitions_process = subprocess.Popen("exec ./alarm_transitions.sh " + args.output_directory +
                                                      'alarm_transitions ' + args.vertica_password, shell=True)
 
     if args.query_api:
