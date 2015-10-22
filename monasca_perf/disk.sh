@@ -6,6 +6,7 @@
 date
 df -h | grep /dev/dm-0
 du -h /var/kafka | tail -n1
+du -h /var/zookeeper | tail -n1
 du -h /var/vertica | tail -n1
 du -h /var/vertica/data | tail -n1
 du -h /var/vertica/catalog | tail -n1

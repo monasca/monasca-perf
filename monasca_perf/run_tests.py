@@ -16,9 +16,12 @@ import datetime
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--query_api", help="Run query_alarm script", action="store_true", required=False)
-    parser.add_argument("--query_alarm_state", help="Run query_alarm_state script", action="store_true", required=False)
-    parser.add_argument("--query_metrics_per_second", help="Run query_metrics_per_second script", action="store_true",
+    parser.add_argument("--query_api", help="Run script to emulate load on our API. Queries alarm-list from api",
+                        action="store_true", required=False)
+    parser.add_argument("--query_alarm_state", help="Query current alarms by state", action="store_true", required=False)
+    parser.add_argument("--query_metrics_per_second", help="Query metrics per second", action="store_true",
+                        required=False)
+    parser.add_argument("--query_alarm_transitions", help="Query alarm transitions per a minute", action="store_true",
                         required=False)
     parser.add_argument("--output_directory",
                         help="Output directory to place result files. Defaults to current directory", default='',
@@ -42,11 +45,14 @@ def main():
     disk_process = subprocess.Popen("exec ./disk_writes.sh " + args.output_directory + 'disk_io', shell=True)
     top_process = subprocess.Popen("exec ./top.sh " + args.output_directory + 'system_info', shell=True)
 
+    if args.query_alarm_transitions:
+        alarm_transitions_process = subprocess.Popen("exec ./alarm_transitions " + args.output_directory +
+                                                     'alarm_transitions ' + args.vertica_password, shell=True)
+
     if args.query_api:
         subprocess.Popen("python query_alarms.py", shell=True)
     if args.query_alarm_state:
-        subprocess.Popen("python query_alarm_state.py --output_directory " +
-                                                     args.output_directory, shell=True)
+        subprocess.Popen("python query_alarm_state.py --output_directory " + args.output_directory, shell=True)
 
     try:
         kafka_process.wait()
@@ -56,6 +62,8 @@ def main():
         kafka_process.kill()
         disk_process.kill()
         top_process.kill()
+        if args.query_alarm_transitions:
+            alarm_transitions_process.kill()
         if args.query_metrics_per_second:
             subprocess.call("python query_metrics_per_second.py " + start_time + " --output_directory " +
                             args.output_directory, shell=True)

@@ -6,7 +6,7 @@ import MySQLdb
 
 
 query = ("select alarm.alarm_definition_id as definition_id, alarm_definition.name as definition_name, "
-         "count(distinct alarm.id) as num_alarms  from alarm join alarm_definition on alarm_definition.id = "
+         "count(distinct alarm.id) as num_alarms from alarm join alarm_definition on alarm_definition.id = "
          "alarm.alarm_definition_id where alarm.state = '{0}' group by alarm.alarm_definition_id;")
 
 

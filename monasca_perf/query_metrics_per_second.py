@@ -24,7 +24,7 @@ keystone = {
 
 # monasca api urls
 urls = [
-    utils.env('MONASCA_API_URL'),
+    'http://192.168.10.4:8070/v2.0',
 ]
 
 
