@@ -40,7 +40,7 @@ ALARM_NAME = 'process_status'
 ALARM_EXPRESSION = 'max(process_status{}, 60) > 0'
 
 THRESHOLD_ENGINE_EVALUATION_PERIOD_SECS = 60
-COLLECTION_PERIOD_SECS = 30
+COLLECTION_PERIOD_SECS = 35
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('monasca-perf')
@@ -79,7 +79,7 @@ def create_alarm_definition():
     defn = {}
     defn['name'] = ALARM_NAME
     defn['expression'] = ALARM_EXPRESSION
-    defn['match_by'] = 'id'
+    defn['match_by'] = ['id']
     return defn
 
 
@@ -222,7 +222,12 @@ for trial in xrange(NUM_TRIALS):
             last_collection_time = current_time
 
         alarms = get_alarms(monasca_client)
-        transitioned = map(lambda x: x['state'] == 'ALARM', alarms)
+
+        transitioned = [None]*NUM_METRICS_PER_TRIAL
+        for alarm in alarms:
+            id = get_metric_id(alarm)
+            transitioned[id] = True if alarm['state'] == 'ALARM' else False
+
         end_transition_times = map(
             lambda x, y: time.time() if x and y is None else y,
             transitioned, end_transition_times)
