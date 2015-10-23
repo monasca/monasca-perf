@@ -1,25 +1,36 @@
+import multiprocessing
 import re
 import sys
 
-processes = ['mon-api',
-             'mon-per+',
-             'mon-age+',
-             'mon-not+',
-             'storm',
-             'kafka',
-             'zookeep+',
-             'dbadmin',
-             'mysql']
+monitoring = ['mon-api',
+              'mon-per+',
+              'mon-age+',
+              'mon-not+',
+              'storm',
+              'kafka',
+              'zookeep+',
+              'dbadmin',
+              'mysql']
 
-# 'rabbitmq'
-# 'elastic+'
-# 'logstash'
-# 'beaver'
-# 'nova'
-# 'neutron'
-# 'cinder'
-# 'glance'
-# 'ceilome+'
+logging = ['rabbitmq',
+           'elastic+',
+           'logstash',
+           'beaver']
+
+openstack = ['nova',
+             'neutron',
+             'cinder',
+             'glance',
+             'ceilome+',
+             'swift',
+             'heat',
+             'horizon+']
+
+hos = ['haproxy',
+       'memcache',
+       'opscon']
+
+watched_processes = monitoring + logging + openstack + hos
 
 cpu = {'user': [],
        'sys': [],
@@ -80,7 +91,8 @@ def aggregate_process_data(node_data, process_data):
         node_data[k] = data
 
 
-def parse_top_file(path):
+def parse_top_file(node_tuple):
+    node_id, path = node_tuple
     node_data = {'system_cpu': {'user': [],
                                 'sys': [],
                                 'idle': [],
@@ -129,7 +141,7 @@ def parse_top_file(path):
             if result:
                 pid, user, _, _, virt, res, shr, _, cpup, mem, _, cmd = line.split()
 
-                if user in processes:
+                if user in watched_processes:
                     res = normalize_memory(res)
                     data_points = process_data.get(user, {'cpu': [], 'mem': []})
                     data_points['cpu'].append(float(cpup))
@@ -138,27 +150,10 @@ def parse_top_file(path):
         else:
             aggregate_process_data(node_data, process_data)
 
-    return node_data
+    return (node_id, node_data)
 
 
-def generate_report(node1, node2, node3):
-    print("{:<10}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
-    print("------------------------------------------")
-    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
-          avg(node1['system_cpu']['idle']),
-          avg(node2['system_cpu']['idle']),
-          avg(node3['system_cpu']['idle'])))
-
-    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
-          min_free(node1),
-          min_free(node2),
-          min_free(node3)))
-    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
-          max_used(node1),
-          max_used(node2),
-          max_used(node3)))
-
-    print("")
+def process_group_report(processes, node1, node2, node3):
     print("{:<10}| {:^8} | {:^8} | {:^8}".format("CPU", "Node 1", "Node 2", "Node 3"))
     print("------------------------------------------")
     total_cpu = {'node1': [], 'node2': [], 'node3': []}
@@ -178,7 +173,7 @@ def generate_report(node1, node2, node3):
                   sum(total_cpu['node2']),
                   sum(total_cpu['node3'])))
 
-    print("")
+    print("\n")
     print("{:<10}| {:^8} | {:^8} | {:^8}".format("MEM", "Node 1", "Node 2", "Node 3"))
     print("------------------------------------------")
     total_mem = {'node1': [], 'node2': [], 'node3': []}
@@ -200,10 +195,57 @@ def generate_report(node1, node2, node3):
                   sum(total_mem['node3']) / 1024))
 
 
-generate_report(parse_top_file(sys.argv[1] + '/node1/' + sys.argv[2] + '/system.top'),
-                parse_top_file(sys.argv[1] + '/node2/' + sys.argv[2] + '/system.top'),
-                parse_top_file(sys.argv[1] + '/node3/' + sys.argv[2] + '/system.top'))
+def generate_report(node1, node2, node3):
+    print("{:<10}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
+    print("------------------------------------------")
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
+          avg(node1['system_cpu']['idle']),
+          avg(node2['system_cpu']['idle']),
+          avg(node3['system_cpu']['idle'])))
 
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
+          min_free(node1),
+          min_free(node2),
+          min_free(node3)))
+    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
+          max_used(node1),
+          max_used(node2),
+          max_used(node3)))
+
+    for name, group in [('Monitoring', monitoring),
+                        ('Logging', logging),
+                        ('Openstack', openstack),
+                        ('HOS', hos)]:
+        print("\n")
+        print("-- {} ------------------".format(name))
+        process_group_report(group, node1, node2, node3)
+
+
+def parallel_parse(data_path, verification_path):
+    nodes = [('node 1', data_path + "/node1/" + verification_path + "/system.top"),
+             ('node 2', data_path + "/node2/" + verification_path + "/system.top"),
+             ('node 3', data_path + "/node3/" + verification_path + "/system.top")]
+
+    pool = multiprocessing.Pool(3)
+    result = pool.map(parse_top_file, nodes)
+    pool.close()
+    pool.join()
+
+    node_results = {}
+    for node_data in result:
+        node_id, data = node_data
+        node_results[node_id] = data
+
+    generate_report(node_results['node 1'],
+                    node_results['node 2'],
+                    node_results['node 3'])
+
+
+parallel_parse(sys.argv[1], sys.argv[2])
+
+# generate_report(parse_top_file(sys.argv[1] + '/node1/' + sys.argv[2] + '/system.top'),
+#                parse_top_file(sys.argv[1] + '/node2/' + sys.argv[2] + '/system.top'),
+#                parse_top_file(sys.argv[1] + '/node3/' + sys.argv[2] + '/system.top'))
 
 # print "mysql: {}".format(build_avg_set(processes['mysql']['cpu']))
 # print "kafka: {}".format(build_avg_set(processes['kafka']['cpu']))
