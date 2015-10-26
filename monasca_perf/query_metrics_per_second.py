@@ -51,7 +51,6 @@ def query_metrics_per_second():
     mon_client = client.Client('2_0', urls[0], token=ks_client.token)
     metrics_data = mon_client.metrics.list(name="metrics.published")
 
-    all_metrics = []
     metric_averages = {}
     for metric in metrics_data:
         measurements = mon_client.metrics.list_measurements(start_time=args.starttime, name="metrics.published", dimensions=metric['dimensions'])
@@ -59,10 +58,9 @@ def query_metrics_per_second():
         for m in measurements[0]['measurements']:
             values.append(m[1])
         metric_averages[metric['dimensions']['hostname']] = (sum(values)/len(values))
-        all_metrics.append(values)
-    if len(metric_averages) > 1:
-        metric_averages['All Hosts'] = (sum(all_metrics)/len(all_metrics))
+
     with open(args.output_directory + 'metrics_per_second', "w") as output_file:
+        output_file.write("{}: {}\n".format("total", sum(metric_averages.values())))
         for k, v in metric_averages.items():
             output_file.write("{} : {}\n".format(k, v))
 
