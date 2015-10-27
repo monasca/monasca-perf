@@ -121,7 +121,8 @@ def wait_for_all_alarms_to_transition(client, state):
         send_metrics(client, metrics)
         alarms = get_alarms(client)
         transitioned = map(lambda x: x['state'] == 'OK', alarms)
-        all_transitioned = reduce(lambda x, y: x and y, transitioned)
+        if transitioned:
+            all_transitioned = reduce(lambda x, y: x and y, transitioned)
         time.sleep(1)
 
 
