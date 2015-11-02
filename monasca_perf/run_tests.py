@@ -29,6 +29,11 @@ def parse_args():
     parser.add_argument("--vertica_password",
                         help="Vertica password for disk.sh and alarm_transitions.sh", default='password',
                         required=False)
+    parser.add_argument("--mysql_password", help="Password for monapi user for the query alarm states", required=False,
+                        default='password')
+    parser.add_argument("--monasca_api_url",
+                        help="Monasca api url to use when querying. Example being http://192.168.10.4:8070/v2.0")
+
     return parser.parse_args()
 
 
@@ -50,9 +55,10 @@ def main():
                                                      'alarm_transitions ' + args.vertica_password, shell=True)
 
     if args.query_api:
-        subprocess.Popen("python query_alarms.py", shell=True)
+        subprocess.Popen("python query_alarms.py --monasca_api_url " + args.monasca_api_url, shell=True)
     if args.query_alarm_state:
-        subprocess.Popen("python query_alarm_state.py --output_directory " + args.output_directory, shell=True)
+        subprocess.Popen("python query_alarm_state.py --output_directory " + args.output_directory +
+                         " --mysql_password " + args.mysql_password, shell=True)
 
     try:
         kafka_process.wait()
@@ -66,7 +72,7 @@ def main():
             alarm_transitions_process.kill()
         if args.query_metrics_per_second:
             subprocess.call("python query_metrics_per_second.py " + start_time + " --output_directory " +
-                            args.output_directory, shell=True)
+                            args.output_directory + " --monasca_api_url " + args.monasca_api_url, shell=True)
 
 if __name__ == "__main__":
     sys.exit(main())
