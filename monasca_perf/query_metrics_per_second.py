@@ -22,11 +22,6 @@ keystone = {
     'region_name': utils.env('OS_REGION_NAME')
 }
 
-# monasca api urls
-urls = [
-    'http://192.168.10.4:8070/v2.0',
-]
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -35,6 +30,8 @@ def parse_args():
     parser.add_argument("--output_directory",
                         help="Output directory to place result files. Defaults to current directory", default='',
                         required=False)
+    parser.add_argument("--monasca_api_url",
+                        help="Monasca api url to use when querying. Example being http://192.168.10.4:8070/v2.0")
     return parser.parse_args()
 
 
@@ -48,7 +45,7 @@ def query_metrics_per_second():
         print 'Failed to authenticate: {}'.format(ex)
         return
 
-    mon_client = client.Client('2_0', urls[0], token=ks_client.token)
+    mon_client = client.Client('2_0', args.monasca_api_url, token=ks_client.token)
     metrics_data = mon_client.metrics.list(name="metrics.published")
 
     metric_averages = {}

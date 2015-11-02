@@ -28,27 +28,24 @@ keystone = {
     'region_name': utils.env('OS_REGION_NAME')
 }
 
-# monasca api urls
-urls = [
-    'http://192.168.10.4:8070/v2.0',
-]
-
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--number_processes", help="Number of processes to run against the API", type=int,
                         required=False, default=10)
+    parser.add_argument("--monasca_api_url",
+                        help="Monasca api url to use when querying. Example being http://192.168.10.4:8070/v2.0")
     return parser.parse_args()
 
 
-def query_alarms():
+def query_alarms(monasca_api_url):
     try:
         ks_client = ksclient.KSClient(**keystone)
     except Exception as ex:
         print 'Failed to authenticate: {}'.format(ex)
         return
 
-    mon_client = client.Client('2_0', urls[0], token=ks_client.token)
+    mon_client = client.Client('2_0', monasca_api_url, token=ks_client.token)
     while True:
         try:
             time.sleep(random.randint(min_wait_time, max_wait_time))
@@ -65,7 +62,7 @@ def query_alarms_test():
 
     process_list = []
     for i in xrange(num_processes):
-        p = multiprocessing.Process(target=query_alarms)
+        p = multiprocessing.Process(target=query_alarms, args=(args.monasca_api_url,))
         process_list.append(p)
 
     for p in process_list:
