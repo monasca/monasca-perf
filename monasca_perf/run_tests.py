@@ -43,6 +43,10 @@ def main():
 
     args = parse_args()
 
+    if (args.query_metrics_per_second or args.query_api) and not args.monasca_api_url:
+        sys.stderr.write('Must provide monasca_api_url if querying metrics per second or API\n')
+        sys.exit()
+
     with open(args.output_directory + 'initial_disk', "w") as stdout:
         subprocess.Popen("./disk.sh " + args.vertica_password, shell=True, stdout=stdout)
 
