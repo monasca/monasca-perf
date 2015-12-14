@@ -12,67 +12,76 @@ the default numbers simulate 10K agent nodes posting 100 metrics/agent node
 
 import httplib
 import multiprocessing
+import random
 import sys
 import time
 import urlparse
 
 import simplejson
+import socket
 
-num_processes = 100
-num_requests = 100
-num_metrics_per_request = 100
+from monascaclient import ksclient
 
-print "total: %s" % (num_processes*num_requests*num_metrics_per_request)
+num_processes = 1
 
-headers = {"Content-type": "application/json", "X-Auth-Token": "3134e6235306414480f48dc6674fba7d"}
-
-urls = [
-    'https://mon-ae1test-monasca01.useast.hpcloud.net:8080/v2.0/metrics',
-    'https://mon-ae1test-monasca02.useast.hpcloud.net:8080/v2.0/metrics',
-    'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0/metrics',
-]
+monasca_url = 'http://mn-ccp-vip-MON-API-mgmt:8070/v2.0'
 
 
-def doWork(url_queue, num_requests,id):
-    url = url_queue.get()
-    for x in xrange(num_requests):
-        status, response = getStatus(url,id,x)
-        doSomethingWithResult(status, response)
+def getToken():
+    keystone = {
+        'username': 'monasca-agent',
+        'password': 'ucy7ycVurehC',
+        'project_id': 'null',
+        'auth_url':  'http://mn-ccp-vip-KEY-API-mgmt:5000/v3'
+    }
+
+    ks_client = ksclient.KSClient(**keystone).token
+    return ks_client.token
 
 
-def getStatus(ourl,id,x):
-    try:
-        url = urlparse.urlparse(ourl)
-        conn = httplib.HTTPSConnection(url.netloc)
-        body = []
-        for i in xrange(num_metrics_per_request):
-            epoch = (int)(time.time()) - 120
-            body.append({"name": "perf-parallel-" + str(i) + "-" + str(x) + "-" + str(id),
-                         "dimensions": {"dim-1": "value-1"},
-                         "timestamp": epoch,
-                         "value": i})
-        body = simplejson.dumps(body)
-        conn.request("POST", url.path, body, headers)
-        res = conn.getresponse()
-        if res.status != 204:
-            raise Exception(res.status)
-        return res.status, ourl
-    except Exception as ex:
-        print ex
-        return "error", ourl
+def post_metrics(id, ourl):
+    headers = {"Content-type": "application/json",
+               "X-Auth-Token": getToken()}
+    while True:
+        try:
+            url = urlparse.urlparse(ourl)
+            conn = httplib.HTTPConnection(url.netloc)
+            body = []
+            for i in xrange(1310):
+                epoch = (int)(time.time()) - 120
+                body.append({"name": "perf-parallel-" + str(i) + "-" + str(id),
+                             "dimensions": {"perf-id": str(id),
+                                            "zone": "nova",
+                                            "service": "compute",
+                                            "resource_id": "34c0ce14-9ce4-4d3d-84a4-172e1ddb26c4",
+                                            "tenant_id": "71fea2331bae4d98bb08df071169806d",
+                                            "hostname": socket.gethostname(),
+                                            "component": "vm",
+                                            "control_plane": "ccp",
+                                            "amplifier": "",
+                                            "cluster": "compute",
+                                            "cloud_name": "monasca"},
+                             "timestamp": epoch * 1000,
+                             "value": i})
+            body = simplejson.dumps(body)
+            conn.request("POST", url.path, body, headers)
+            res = conn.getresponse()
+            if res.status == 401:
+                headers['X-Auth-Token'] = getToken()
+            if res.status != 204:
+                raise Exception(res.status)
+            time.sleep(random.randint(20, 30))
+        except Exception as ex:
+            print(ex)
+            return "error", ourl
 
 
 def doSomethingWithResult(status, url):
     pass
 
-q = multiprocessing.Queue()
-for i in xrange(num_processes):
-    url = urls[i % len(urls)]
-    q.put(url.strip())
-
 process_list = []
 for i in range(num_processes):
-    p = multiprocessing.Process(target=doWork, args=(q, num_requests,i))
+    p = multiprocessing.Process(target=post_metrics, args=(i, monasca_url))
     process_list.append(p)
     p.start()
 
