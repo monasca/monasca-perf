@@ -1,177 +1,119 @@
-from urlparse import urlparse
-from threading import Thread
-import httplib, sys, multiprocessing
-from Queue import Queue
-import os
-import signal
-import simplejson
-import json
+import random
+import socket
+import sys
 import time
-from datetime import datetime
-import logging
-import logging.config
+import multiprocessing
+import argparse
+import yaml
 
-# Run as "python agent_simulator.py
+from monascaclient import client
+from monascaclient import ksclient
+from monascaclient import exc
 
-RNDD_KAFKA0002 = 'http://127.0.0.1:8080/v2.0/metrics'
+wait_time = 30
 
-# select which API URL to use
-api_url = RNDD_KAFKA0002
+number_of_metrics = 1310
 
-# num_process x num_requests will be the number of http connections.  
-# beware that 20,000 connections will cause too many ephemeral ports used
-# on a single api server (with one ipaddress).  Would recommend not greater than 1000
-num_processes = 500
 
-# number of requests sent per interval (normally 1-20 max if doing continuous)
-num_requests = 4
+class AgentInfo:
 
-# the agent sends anywhere between 40-360 metrics per request
-num_metrics_per_request = 100
-
-# (for continuous) The seconds to wait to send metrics. valid range 1-60 (lowest recommended is 10 by the agent)
-interval = 20
-
-# when False runs once, when True runs continuously sending num_requests every interval.
-continuous = False
-
-log = logging.getLogger(__name__)
-print ("continuous = %d") % continuous
-print ("using URL: %s") % api_url
-print ("num_process = %d" % num_processes)
-print ("num_metrics_per_request = %d" % num_metrics_per_request)
-print ("num requests (sent per interval if continuous) = %d") % num_requests
-print ("interval (secs) = %d" % interval)
-print ("total metrics sent (per interval) = %d" % (num_processes * num_requests * num_metrics_per_request))
-print ("total connections (per interval) = %d" % (num_processes * num_requests))
-
-headers = {"Content-type": "application/json", "X-Auth-Token": "12345678"}
-url = urlparse(api_url)
-processors = []  # global list to facilitate clean signal handling
-exiting = False
-
-class MetricPost():
-    """Metrics Post process.
-    
-    """
-    def __init__(self, proc_num, continuous=False):      
-        self.proc_num = str(proc_num)
-        self.continuous = continuous
-
-    def doWorkContinuously(self):
-        while(True):
-            start_send = time.time()
-            for x in xrange(num_requests):
-                status,response=self.postMetrics()
-                self.doSomethingWithResult(status,response)
-            end_send = time.time()
-            secs = end_send - start_send
-            if secs < interval:
-                sleep_interval = interval - secs
-            else: 
-                sleep_interval = 0
-                print ("send seconds %f took longer than interval %f, not sleeping" % (secs, interval))
-            #print ("send time = %f, sleep time = %f" % (secs, sleep_interval) )
-            time.sleep(sleep_interval)
-                
-    def doWorkOnce(self):
-        start_send = time.time()
-        for x in xrange(num_requests):
-            status,response=self.postMetrics()
-            self.doSomethingWithResult(status,response)
-        end_send = time.time()
-        secs = end_send - start_send
-        print ("send time in seconds = %f" % (secs))
-
-    def postMetrics(self):
-        try:
-            conn = httplib.HTTPConnection(url.netloc)
-            body = []
-            for i in xrange(num_metrics_per_request):
-                epoch = (int)(time.time()) - 120
-                body.append({"name": "cube" + str(i), "dimensions": {"hostname": "server-" + self.proc_num}, "timestamp": epoch, "value": i})
-            body = json.dumps(body, encoding='utf8')
-            conn.request("POST", url.path, body, headers)
-            res = conn.getresponse()
-            if res.status != 204:
-                raise Exception(res.status)
-            return res.status, api_url
-        except Exception as ex:
-            print ex
-            return "error", api_url
-
-    def doSomethingWithResult(self, status, response):
+    def __init__(self):
         pass
 
-    def run(self):
-        if self.continuous:
-            self.doWorkContinuously()
-        else:
-            self.doWorkOnce()
+    keystone = {}
+    monasca_url = ''
 
 
-def clean_exit(signum, frame=None):
-    """
-    Exit all processes attempting to finish uncommited active work before exit.
-    Can be called on an os signal or no zookeeper losing connection.
-    """
-    global exiting
-    if exiting:
-        # Since this is set up as a handler for SIGCHLD when this kills one child it gets another signal, the global
-        # exiting avoids this running multiple times.
-        log.debug('Exit in progress clean_exit received additional signal %s' % signum)
-        return
-
-    log.info('Received signal %s, beginning graceful shutdown.' % signum)
-    exiting = True
-
-    for process in processors:
-        try:
-            if process.is_alive():
-                process.terminate()
-        except Exception:
-            pass
-
-    # Kill everything, that didn't already die
-    for child in multiprocessing.active_children():
-        log.debug('Killing pid %s' % child.pid)
-        try:
-            os.kill(child.pid, signal.SIGKILL)
-        except Exception:
-            pass
-
-    sys.exit(0)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--number_agents", help="Number of agents to emulate sending metrics to the API", type=int,
+                        required=False, default=30)
+    return parser.parse_args()
 
 
-if __name__ == '__main__':
-    log.info('num_processes %d', num_processes)
-    for x in xrange(0, num_processes):       
-        p = multiprocessing.Process(
-            target=MetricPost(x, continuous).run
-        )
-        processors.append(p)
-
-    ## Start
+def get_token(keystone):
     try:
-        log.info('Starting processes')
-        print ('Starting processes %s' % str(datetime.now()))
-        start = time.time()
-        for process in processors:
-            process.start()
+        ks_client = ksclient.KSClient(**keystone)
+    except Exception as ex:
+        print 'Failed to authenticate: {}'.format(ex)
+        return None
+    return ks_client.token
 
-        # The signal handlers must be added after the processes start otherwise they run on all processes
-        signal.signal(signal.SIGCHLD, clean_exit)
-        signal.signal(signal.SIGINT, clean_exit)
-        signal.signal(signal.SIGTERM, clean_exit)
 
-        log.info('calling Process.join() ')
-        for process in processors:
-            process.join()
-        end = time.time()
-        print ("runtime = %d seconds" % (end - start))
-    except Exception:
-        print ('Error! Exiting.')
-        for process in processors:
-            process.terminate()
-        end = time.time()
-        print ("runtime = %d seconds" % (end - start))
+def create_metric_list(process_number):
+    metrics = []
+    for i in xrange(number_of_metrics):
+        epoch = (int)(time.time()) - 120
+        metrics.append({"name": "perf-parallel-" + str(i) + "-" + str(process_number),
+                        "dimensions": {"perf-id": str(process_number),
+                                       "zone": "nova",
+                                       "service": "compute",
+                                       "resource_id": "34c0ce14-9ce4-4d3d-84a4-172e1ddb26c4",
+                                       "tenant_id": "71fea2331bae4d98bb08df071169806d",
+                                       "hostname": socket.gethostname(),
+                                       "component": "vm",
+                                       "control_plane": "ccp",
+                                       "cluster": "compute",
+                                       "cloud_name": "monasca"},
+                        "timestamp": epoch * 1000,
+                        "value": i})
+    return metrics
+
+
+def send_metrics(agent_info, process_number):
+    time.sleep(random.randint(0, 60))
+    token = get_token(agent_info.keystone)
+    if token is None:
+        return
+    while True:
+        try:
+            mon_client = client.Client('2_0', agent_info.monasca_url, token=token)
+            start_send = time.time()
+            metrics = create_metric_list(process_number)
+            mon_client.metrics.create(jsonbody=metrics)
+            end_send = time.time()
+            secs = end_send - start_send
+            time.sleep(wait_time-secs)
+        except KeyboardInterrupt:
+            return
+        except exc.HTTPUnauthorized:
+            token = get_token(agent_info.keystone)
+
+
+def parse_agent_config(agent_info):
+    agent_config_file = open('/etc/monasca/agent/agent.yaml')
+    agent_config = yaml.load(agent_config_file)
+    agent_info.keystone['username'] = agent_config['Api']['username']
+    agent_info.keystone['password'] = agent_config['Api']['password']
+    agent_info.keystone['auth_url'] = agent_config['Api']['keystone_url']
+    agent_info.keystone['project_name'] = agent_config['Api']['project_name']
+    agent_info.monasca_url = agent_config['Api']['url']
+
+
+def agent_simulator_test():
+
+    args = parse_args()
+    num_processes = args.number_agents
+    agent_info = AgentInfo()
+    parse_agent_config(agent_info)
+    process_list = []
+    for i in xrange(num_processes):
+        p = multiprocessing.Process(target=send_metrics, args=(agent_info, i))
+        process_list.append(p)
+
+    for p in process_list:
+        p.start()
+
+    try:
+        for p in process_list:
+            try:
+                p.join()
+            except Exception:
+                pass
+
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    sys.exit(agent_simulator_test())
