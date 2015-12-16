@@ -92,63 +92,69 @@ def aggregate_process_data(node_data, process_data):
 
 
 def parse_top_file(node_tuple):
-    node_id, path = node_tuple
-    node_data = {'system_cpu': {'user': [],
-                                'sys': [],
-                                'idle': [],
-                                'wait': []},
-                 'system_mem': {'free': [],
-                                'buffers': [],
-                                'cache': []}}
-
-    process_data = {}
-    with open(path, 'r') as f:
-        for line in f:
-            line = line.rstrip()
-
-            if not line:
-                continue
-
-            result = re.match("top -", line)
-            if result:
+    try:
+        node_id, path = node_tuple
+        node_data = {'system_cpu': {'user': [],
+                                    'sys': [],
+                                    'idle': [],
+                                    'wait': []},
+                     'system_mem': {'free': [],
+                                    'buffers': [],
+                                    'cache': []}}
+    
+        process_data = {}
+        with open(path, 'r') as f:
+            for line in f:
+                line = line.rstrip()
+    
+                if not line:
+                    continue
+    
+                result = re.match("top -", line)
+                if result:
+                    aggregate_process_data(node_data, process_data)
+                    process_data = {}
+    
+                result = re.match("Tasks:", line)
+                if result:
+                    continue
+    
+                result = re.match("%Cpu.*?(\d+.\d+) us.*?(\d+.\d+) sy.*?(\d+.\d+) id.*?(\d+.\d+) wa", line)
+                if result:
+                    node_data['system_cpu']['user'].append(float(result.group(1)))
+                    node_data['system_cpu']['sys'].append(float(result.group(2)))
+                    node_data['system_cpu']['idle'].append(float(result.group(3)))
+                    node_data['system_cpu']['wait'].append(float(result.group(4)))
+                    continue
+    
+                result = re.match("KiB Mem:.*?(\d+) free.*?(\d+) buffers", line)
+                if result:
+                    node_data['system_mem']['free'].append(float(result.group(1)) / 1024 / 1024)
+                    node_data['system_mem']['buffers'].append(float(result.group(2)) / 1024 / 1024)
+                    continue
+    
+                result = re.match("KiB Swap:.*?(\d+) cached", line)
+                if result:
+                    node_data['system_mem']['cache'].append(float(result.group(1)) / 1024 / 1024)
+                    continue
+    
+                result = re.match("^\s*\d", line)
+                if result:
+                    pid, user, _, _, virt, res, shr, _, cpup, mem, _, cmd = line.split()
+    
+                    if user in watched_processes:
+                        res = normalize_memory(res)
+                        data_points = process_data.get(user, {'cpu': [], 'mem': []})
+                        data_points['cpu'].append(float(cpup))
+                        data_points['mem'].append(float(res))
+                        process_data[user] = data_points
+            else:
                 aggregate_process_data(node_data, process_data)
-                process_data = {}
-
-            result = re.match("Tasks:", line)
-            if result:
-                continue
-
-            result = re.match("%Cpu.*?(\d+.\d+) us.*?(\d+.\d+) sy.*?(\d+.\d+) id.*?(\d+.\d+) wa", line)
-            if result:
-                node_data['system_cpu']['user'].append(float(result.group(1)))
-                node_data['system_cpu']['sys'].append(float(result.group(2)))
-                node_data['system_cpu']['idle'].append(float(result.group(3)))
-                node_data['system_cpu']['wait'].append(float(result.group(4)))
-                continue
-
-            result = re.match("KiB Mem:.*?(\d+) free.*?(\d+) buffers", line)
-            if result:
-                node_data['system_mem']['free'].append(float(result.group(1)) / 1024 / 1024)
-                node_data['system_mem']['buffers'].append(float(result.group(2)) / 1024 / 1024)
-                continue
-
-            result = re.match("KiB Swap:.*?(\d+) cached", line)
-            if result:
-                node_data['system_mem']['cache'].append(float(result.group(1)) / 1024 / 1024)
-                continue
-
-            result = re.match("^\s*\d", line)
-            if result:
-                pid, user, _, _, virt, res, shr, _, cpup, mem, _, cmd = line.split()
-
-                if user in watched_processes:
-                    res = normalize_memory(res)
-                    data_points = process_data.get(user, {'cpu': [], 'mem': []})
-                    data_points['cpu'].append(float(cpup))
-                    data_points['mem'].append(float(res))
-                    process_data[user] = data_points
-        else:
-            aggregate_process_data(node_data, process_data)
+    except Exception:
+        import traceback
+        print("error on file: {}".format(path))
+        print("line: {}".format(line))
+        traceback.print_exc()
 
     return (node_id, node_data)
 
@@ -158,6 +164,8 @@ def process_group_report(processes, node1, node2, node3):
     print("------------------------------------------")
     total_cpu = {'node1': [], 'node2': [], 'node3': []}
     for k in processes:
+        if k not in node1:
+            continue
         n1 = avg(node1[k]['cpu'])
         n2 = avg(node2[k]['cpu'])
         n3 = avg(node3[k]['cpu'])
@@ -178,6 +186,8 @@ def process_group_report(processes, node1, node2, node3):
     print("------------------------------------------")
     total_mem = {'node1': [], 'node2': [], 'node3': []}
     for k in processes:
+        if k not in node1:
+            continue
         total_mem['node1'].append(max(node1[k]['mem']))
         total_mem['node2'].append(max(node2[k]['mem']))
         total_mem['node3'].append(max(node3[k]['mem']))
@@ -222,9 +232,9 @@ def generate_report(node1, node2, node3):
 
 
 def parallel_parse(data_path, verification_path):
-    nodes = [('node 1', data_path + "/node1/" + verification_path + "/system.top"),
-             ('node 2', data_path + "/node2/" + verification_path + "/system.top"),
-             ('node 3', data_path + "/node3/" + verification_path + "/system.top")]
+    nodes = [('node 1', data_path + "/node1/" + verification_path + "/system_info"),
+             ('node 2', data_path + "/node2/" + verification_path + "/system_info"),
+             ('node 3', data_path + "/node3/" + verification_path + "/system_info")]
 
     pool = multiprocessing.Pool(3)
     result = pool.map(parse_top_file, nodes)
