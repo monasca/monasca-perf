@@ -1,6 +1,7 @@
 import subprocess
 import sys
 import argparse
+import time
 import datetime
 
 # Available tests
@@ -33,6 +34,9 @@ def parse_args():
                         default='password')
     parser.add_argument("--monasca_api_url",
                         help="Monasca api url to use when querying. Example being http://192.168.10.4:8070/v2.0")
+    parser.add_argument("--run_time",
+                        help="How long, in mins, collection will run. Defaults to run indefinitely until the user hits"
+                             " control c", required=False, type=int, default=None)
 
     return parser.parse_args()
 
@@ -42,37 +46,49 @@ def main():
     start_time = datetime.datetime.utcnow().isoformat()
 
     args = parse_args()
+    test_processes = []
 
     with open(args.output_directory + 'initial_disk', "w") as stdout:
         subprocess.Popen("./disk.sh " + args.vertica_password, shell=True, stdout=stdout)
 
     kafka_process = subprocess.Popen("exec ./kafka_topics.sh " + args.output_directory + 'kafka_info', shell=True)
-    disk_process = subprocess.Popen("exec ./disk_writes.sh " + args.output_directory + 'disk_io', shell=True)
     top_process = subprocess.Popen("exec ./top.sh " + args.output_directory + 'system_info', shell=True)
 
     if args.query_alarm_transitions:
-        alarm_transitions_process = subprocess.Popen("exec ./alarm_transitions.sh " + args.output_directory +
-                                                     'alarm_transitions ' + args.vertica_password, shell=True)
+        test_processes.append(subprocess.Popen("exec ./alarm_transitions.sh " + args.output_directory +
+                                               'alarm_transitions ' + args.vertica_password, shell=True))
 
     if args.query_api:
-        subprocess.Popen("python query_alarms.py --monasca_api_url " + args.monasca_api_url, shell=True)
+        cmd_line = "python query_alarms.py --monasca_api_url " + args.monasca_api_url
+        if args.run_time:
+            cmd_line += " --run_time " + str(args.run_time)
+        test_processes.append(subprocess.Popen(cmd_line, shell=True))
     if args.query_alarm_state:
-        subprocess.Popen("python query_alarm_state.py --output_directory " + args.output_directory +
-                         " --mysql_password " + args.mysql_password, shell=True)
+        cmd_line = "python query_alarm_state.py --output_directory " + args.output_directory + " --mysql_password " + \
+                   args.mysql_password
+        if args.run_time:
+            cmd_line += " --run_time " + str(args.run_time)
+        test_processes.append(subprocess.Popen(cmd_line, shell=True))
 
-    try:
-        kafka_process.wait()
-    except KeyboardInterrupt:
-        with open(args.output_directory + 'final_disk', "w") as stdout:
-            subprocess.Popen("./disk.sh " + args.vertica_password, shell=True, stdout=stdout)
-        kafka_process.kill()
-        disk_process.kill()
-        top_process.kill()
-        if args.query_alarm_transitions:
-            alarm_transitions_process.kill()
-        if args.query_metrics_per_second:
-            subprocess.call("python query_metrics_per_second.py " + start_time + " --output_directory " +
-                            args.output_directory + " --monasca_api_url " + args.monasca_api_url, shell=True)
+    if args.run_time is None:
+        try:
+            kafka_process.wait()
+        except KeyboardInterrupt:
+            for p in test_processes:
+                p.kill()
+    else:
+        time.sleep(args.run_time * 60)
+
+    with open(args.output_directory + 'final_disk', "w") as stdout:
+        subprocess.Popen("./disk.sh " + args.vertica_password, shell=True, stdout=stdout)
+
+    kafka_process.kill()
+    top_process.kill()
+
+    if args.query_metrics_per_second:
+        subprocess.call("python query_metrics_per_second.py " + start_time + " --output_directory " +
+                        args.output_directory + " --monasca_api_url " + args.monasca_api_url, shell=True)
+
 
 if __name__ == "__main__":
     sys.exit(main())
