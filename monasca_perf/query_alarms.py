@@ -32,9 +32,12 @@ keystone = {
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--number_processes", help="Number of processes to run against the API", type=int,
-                        required=False, default=10)
+                        required=False, default=3)
     parser.add_argument("--monasca_api_url",
                         help="Monasca api url to use when querying. Example being http://192.168.10.4:8070/v2.0")
+    parser.add_argument("--run_time",
+                        help="How long, in mins, collection will run. Defaults to run indefinitely until the user hits"
+                             " control c", required=False, type=int, default=None)
     return parser.parse_args()
 
 
@@ -50,7 +53,7 @@ def query_alarms(monasca_api_url):
         try:
             time.sleep(random.randint(min_wait_time, max_wait_time))
             ## TO DO WRITE THE AMOUNT OF TIME TO GET ANSWER BACK TO FILE AND AVERAGE AT THE END
-            alarms = mon_client.alarms.list()
+            print mon_client.alarms.list()
         except KeyboardInterrupt:
             return
 
@@ -67,16 +70,19 @@ def query_alarms_test():
 
     for p in process_list:
         p.start()
-
-    try:
+    if args.run_time is not None:
+        time.sleep(args.run_time * 60)
         for p in process_list:
-            try:
-                p.join()
-            except Exception:
-                pass
-
-    except KeyboardInterrupt:
-        pass
+            p.terminate()
+    else:
+        try:
+            for p in process_list:
+                try:
+                    p.join()
+                except Exception:
+                    pass
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == "__main__":
