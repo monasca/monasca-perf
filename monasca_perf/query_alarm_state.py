@@ -19,7 +19,9 @@ def parse_args():
                         default='localhost')
     parser.add_argument("--output_directory",
                         help="Output directory to place result files. Defaults to current directory", required=False)
-
+    parser.add_argument("--run_time",
+                        help="How long, in mins, collection will run. Defaults to run indefinitely until the user hits"
+                             " control c", required=False, type=int, default=None)
     return parser.parse_args()
 
 
@@ -73,15 +75,19 @@ def query_alarms_test():
     for p in process_list:
         p.start()
 
-    try:
+    if args.run_time is not None:
+        time.sleep(args.run_time * 60)
         for p in process_list:
-            try:
-                p.join()
-            except Exception:
-                pass
-
-    except KeyboardInterrupt:
-        pass
+            p.terminate()
+    else:
+        try:
+            for p in process_list:
+                try:
+                    p.join()
+                except Exception:
+                    pass
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == "__main__":

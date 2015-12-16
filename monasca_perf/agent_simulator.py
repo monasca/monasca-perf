@@ -28,6 +28,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--number_agents", help="Number of agents to emulate sending metrics to the API", type=int,
                         required=False, default=30)
+    parser.add_argument("--run_time",
+                        help="How long, in mins, collection will run. Defaults to run indefinitely until the user hits"
+                             " control c", required=False, type=int, default=None)
     return parser.parse_args()
 
 
@@ -91,7 +94,6 @@ def parse_agent_config(agent_info):
 
 
 def agent_simulator_test():
-
     args = parse_args()
     num_processes = args.number_agents
     agent_info = AgentInfo()
@@ -103,16 +105,19 @@ def agent_simulator_test():
 
     for p in process_list:
         p.start()
-
-    try:
+    if args.run_time is not None:
+        time.sleep(args.run_time * 60)
         for p in process_list:
-            try:
-                p.join()
-            except Exception:
-                pass
-
-    except KeyboardInterrupt:
-        pass
+            p.terminate()
+    else:
+        try:
+            for p in process_list:
+                try:
+                    p.join()
+                except Exception:
+                    pass
+        except KeyboardInterrupt:
+            pass
 
 
 if __name__ == "__main__":
