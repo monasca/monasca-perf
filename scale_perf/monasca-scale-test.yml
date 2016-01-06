@@ -1,0 +1,106 @@
+---
+- name: Copy over performance scripts and start collection scripts
+  hosts: MON-API
+  sudo: yes
+  tags: run_collection
+  vars_files:
+    - roles/monasca-variables/defaults/main.yml
+    - roles/vertica/defaults/main.yml
+    - roles/vertica/vars/main.yml
+  tasks:
+    - name: Copy over scale_perf directory to nodes
+      copy: src=/home/stack/scale_perf dest=/home/stack
+    - name: Change permissions on scale bash scripts
+      file: path={{ item }} mode=0755
+      with_items:
+        - /home/stack/scale_perf/alarm_transitions.sh
+        - /home/stack/scale_perf/disk.sh
+        - /home/stack/scale_perf/kafka_topics.sh
+        - /home/stack/scale_perf/top.sh
+    - name: Make sure output directory and run time is given
+      fail: msg="Must provide an output directory and run_time for the performances tests"
+      when: output_directory is not defined or run_time is not defined
+    - name: Make sure output directory is created
+      file: path=/home/stack/monasca_output/{{output_directory}} state=directory
+    - name: Start agent simulation if number of agents is set
+      shell: >
+        : && . {{ monasca_agent_virtualenv_dir }}/bin/activate &&
+        python agent_simulator.py
+        --number_agents {{ number_agents }}
+        --run_time {{ run_time | int + 5 }} &
+      when: number_agents is defined
+      args:
+        chdir: /home/stack/scale_perf
+    - name: pause for agent simulation to start up
+      pause: minutes=1
+      run_once: true
+      when: number_agents is defined
+    - name: Start collection
+      shell: >
+        : && . /home/stack/service.osrc &&
+        . {{ monasca_agent_virtualenv_dir }}/bin/activate &&
+        python run_tests.py
+        --output_directory /home/stack/monasca_output/{{ output_directory }}/
+        --vertica_password {{vertica_dbadmin_password}}
+        --monasca_api_url http://{{ inventory_hostname }}:8070/v2.0
+        --query_metrics_per_second
+        --run_time {{run_time}} &
+      args:
+        chdir: /home/stack/scale_perf
+    - name: Make sure output directory locally is created
+      file: path={{ item }} state=directory mode=777
+      with_items:
+        - /home/stack/monasca_output/{{ output_directory }}/node1
+        - /home/stack/monasca_output/{{ output_directory }}/node2
+        - /home/stack/monasca_output/{{ output_directory }}/node3
+      delegate_to: 127.0.0.1
+      run_once: true
+    - name: pause for run_tests to complete
+      pause: minutes={{ run_time }}
+      run_once: true
+
+- name: Copy results back
+  hosts: MON-API[0]
+  sudo: yes
+  tags: collect_data
+  tasks:
+    - name: Fetch results
+      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_output/{{ output_directory }}/node1/ flat=yes
+      with_items:
+        - initial_disk
+        - final_disk
+        - kafka_info
+        - metrics_per_second
+        - system_info
+
+- name: Copy results back
+  hosts: MON-API[1]
+  sudo: yes
+  tags: collect_data
+  tasks:
+    - name: Fetch results
+      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_output/{{ output_directory }}/node2/ flat=yes
+      with_items:
+        - initial_disk
+        - final_disk
+        - kafka_info
+        - metrics_per_second
+        - system_info
+
+- name: Copy results back and run parser
+  hosts: MON-API[2]
+  sudo: yes
+  tags: collect_data
+  tasks:
+    - name: Fetch results
+      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_output/{{ output_directory }}/node3/ flat=yes
+      with_items:
+        - initial_disk
+        - final_disk
+        - kafka_info
+        - metrics_per_second
+        - system_info
+    - name: Run top parser
+      shell: python /home/stack/scale_perf/top_parser.py /home/stack/monasca_output/{{ output_directory }}/ '' > /home/stack/monasca_output/{{ output_directory }}/cpu_info
+      delegate_to: 127.0.0.1
+
