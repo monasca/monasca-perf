@@ -3,6 +3,7 @@ import sys
 import argparse
 import time
 import datetime
+import os
 
 # Available tests
 # Disk.sh to check initial and final disk
@@ -52,7 +53,7 @@ def main():
         subprocess.Popen("./disk.sh " + args.vertica_password, shell=True, stdout=stdout)
 
     kafka_process = subprocess.Popen("exec ./kafka_topics.sh " + args.output_directory + 'kafka_info', shell=True)
-    top_process = subprocess.Popen("exec ./top.sh " + args.output_directory + 'system_info', shell=True)
+    top_process = subprocess.Popen("exec top -b -d 1 " + args.output_directory + 'system_info', shell=True)
 
     if args.query_alarm_transitions:
         test_processes.append(subprocess.Popen("exec ./alarm_transitions.sh " + args.output_directory +
@@ -83,7 +84,7 @@ def main():
         subprocess.Popen("./disk.sh " + args.vertica_password, shell=True, stdout=stdout)
 
     kafka_process.kill()
-    top_process.kill()
+    os.kill(top_process.pid, 9)
 
     if args.query_metrics_per_second:
         subprocess.call("python query_metrics_per_second.py " + start_time + " --output_directory " +
