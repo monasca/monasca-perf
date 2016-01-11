@@ -27,7 +27,7 @@
         : && . {{ monasca_agent_virtualenv_dir }}/bin/activate &&
         nohup python agent_simulator.py
         --number_agents {{ number_agents }}
-        --run_time {{ run_time | int + 5 }} &
+        --run_time {{ run_time | int + 2 }} &
       when: number_agents is defined
       args:
         chdir: /home/stack/scale_perf
