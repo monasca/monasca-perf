@@ -25,7 +25,7 @@
     - name: Start agent simulation if number of agents is set
       shell: >
         : && . {{ monasca_agent_virtualenv_dir }}/bin/activate &&
-        python agent_simulator.py
+        nohup python agent_simulator.py
         --number_agents {{ number_agents }}
         --run_time {{ run_time | int + 5 }} &
       when: number_agents is defined
@@ -39,7 +39,7 @@
       shell: >
         : && . /home/stack/service.osrc &&
         . {{ monasca_agent_virtualenv_dir }}/bin/activate &&
-        python run_tests.py
+        nohup python run_tests.py
         --output_directory /home/stack/monasca_output/{{ output_directory }}/
         --vertica_password {{vertica_dbadmin_password}}
         --monasca_api_url http://{{ inventory_hostname }}:8070/v2.0
