@@ -50,9 +50,9 @@
     - name: Make sure output directory locally is created
       file: path={{ item }} state=directory mode=777
       with_items:
-        - /home/stack/monasca_output/{{ output_directory }}/node1
-        - /home/stack/monasca_output/{{ output_directory }}/node2
-        - /home/stack/monasca_output/{{ output_directory }}/node3
+        - /home/stack/monasca_test/{{ output_directory }}/node1
+        - /home/stack/monasca_test/{{ output_directory }}/node2
+        - /home/stack/monasca_test/{{ output_directory }}/node3
       delegate_to: 127.0.0.1
       run_once: true
     - name: pause for run_tests to complete
@@ -65,7 +65,7 @@
   tags: collect_data
   tasks:
     - name: Fetch results
-      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_output/{{ output_directory }}/node1/ flat=yes
+      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_test/{{ output_directory }}/node1/ flat=yes
       with_items:
         - initial_disk
         - final_disk
@@ -79,7 +79,7 @@
   tags: collect_data
   tasks:
     - name: Fetch results
-      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_output/{{ output_directory }}/node2/ flat=yes
+      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_test/{{ output_directory }}/node2/ flat=yes
       with_items:
         - initial_disk
         - final_disk
@@ -93,7 +93,7 @@
   tags: collect_data
   tasks:
     - name: Fetch results
-      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_output/{{ output_directory }}/node3/ flat=yes
+      fetch: src=/home/stack/monasca_output/{{ output_directory }}/{{ item }} dest=/home/stack/monasca_test/{{ output_directory }}/node3/ flat=yes
       with_items:
         - initial_disk
         - final_disk
@@ -101,6 +101,6 @@
         - metrics_per_second
         - system_info
     - name: Run top parser
-      shell: python /home/stack/scale_perf/top_parser.py /home/stack/monasca_output/{{ output_directory }}/ '' > /home/stack/monasca_output/{{ output_directory }}/cpu_info
+      shell: python /home/stack/scale_perf/top_parser.py /home/stack/monasca_test/{{ output_directory }}/ '' > /home/stack/monasca_test/{{ output_directory }}/cpu_info
       delegate_to: 127.0.0.1
 
