@@ -2,7 +2,8 @@ import cProfile
 import mock
 import timeit
 
-from monasca_agent.collector.checks_d.process import ProcessCheck as agent_plugin
+from monasca_agent.collector.checks_d.process import ProcessCheck as \
+    agent_plugin
 
 agent_config = {'autorestart': False, 'hostname': 'mini-mon',
                 'dimensions': {'service': 'monitoring'},
@@ -40,4 +41,4 @@ if __name__ == '__main__':
                         repeat=3,
                         setup="from __main__ import test"))
     pr.create_stats()
-    pr.print_stats()
+    pr.print_stats(sort='tottime')
