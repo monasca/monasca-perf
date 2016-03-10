@@ -47,7 +47,7 @@ def create_metric_list(process_number):
     metrics = []
     for i in xrange(number_of_metrics):
         epoch = (int)(time.time()) - 120
-        metrics.append({"name": "perf-parallel-" + str(i) + "-" + str(process_number),
+        metrics.append({"name": "perf-parallel-" + str(i),
                         "dimensions": {"perf-id": str(process_number),
                                        "zone": "nova",
                                        "service": "compute",
