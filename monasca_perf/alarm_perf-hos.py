@@ -1,6 +1,6 @@
 # alarm_perf-hos.py
 # measure alarm creation rate
-# adapted to run in CEQA HLM004 environment
+# adapted to run in CEQA HLM203 environment
 
 import datetime
 import re
@@ -20,9 +20,11 @@ def no_warnings(message, category, filename, lineno):
     pass
 warnings.showwarning = no_warnings
 
+# default to 20K alarms
 num_processes = 10
-num_requests = 10 
-num_metrics = 10
+num_requests = 20 
+num_metrics = 100
+
 num_definitions = 4
 
 max_wait_time = 20  # Seconds
@@ -30,16 +32,18 @@ max_wait_time = 20  # Seconds
 # specify if the test should remove the generated alarms
 cleanup_after_test = False
 
+# update for current env keystone url
 keystone = {
     'username': 'admin',
-    'password': 'admin',
+    'password': 'WSziUWHju1A',
     'project_name': 'admin',
-    'auth_url': 'http://hlm004-ccp-vip-admin-KEY-API-mgmt:35357/v3',
+    'auth_url': 'http://10.241.225.128:5000/v3'
 }
 
 # monasca api urls
+# update for current env monasca api url
 urls = [
-    'http://hlm004-ccp-vip-MON-API-mgmt:8070/v2.0'
+    'http://10.241.225.128:8070/v2.0',
 ]
 
 metric_name = 'alarm_perf'
