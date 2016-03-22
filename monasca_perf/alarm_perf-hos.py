@@ -68,7 +68,7 @@ class MetricCreatorAlarmPerf():
     def create_metric(self):
         host_num = self.num_calls + self.proc_num * num_requests * num_metrics
         metric = {"name": metric_name + str(self.proc_num % num_definitions),
-                  "dimensions": {metric_dimension: "value-" + str(host_num)},
+                  "dimensions": {metric_dimension: "value-" + str(host_num), 'service': "uncategorized"},
                   "timestamp": time.time()*1000 + self.num_calls, # make sure each timestamp is unique,
                                                                   # else influx 9 will overwrite previous metric
                   "value": 0}
