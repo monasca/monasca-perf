@@ -62,7 +62,7 @@ def query_measurement_average():
     try:
         ks_client = ksclient.KSClient(**keystone)
     except Exception as ex:
-        print 'Failed to authenticate: {}'.format(ex)
+        print('Failed to authenticate: {}'.format(ex))
         return
 
     mon_client = client.Client('2_0', args.monasca_api_url, token=ks_client.token)
@@ -74,16 +74,33 @@ def query_measurement_average():
         dimensions = metric['dimensions']
         if dimensions['hostname'] not in measurement_averages:
             measurement_averages[dimensions['hostname']] = {}
-        cpu_average = get_measurements_average(mon_client, args.starttime, "process.cpu_perc", dimensions, args.endtime)
-        mem_average = get_measurements_average(mon_client, args.starttime, "process.mem.rss_mbytes", dimensions, args.endtime)
-        measurement_averages[dimensions['hostname']][dimensions['process_name']] = [cpu_average, mem_average]
+
+        cpu_average = get_measurements_average(mon_client,
+                                               args.starttime,
+                                               "process.cpu_perc",
+                                               dimensions,
+                                               args.endtime)
+
+        mem_average = get_measurements_average(mon_client,
+                                               args.starttime,
+                                               "process.mem.rss_mbytes",
+                                               dimensions,
+                                               args.endtime)
+
+        host = dimensions['hostname']
+        proc = dimensions['process_name']
+        measurement_averages[host][proc] = [cpu_average, mem_average]
+
     for host in measurement_averages.keys():
         with open(args.output_directory + host, "w") as output_file:
-            output_file.write("{:<30}| {:^10} | {:^10}\n".format("Process Name", "Cpu %", "Memory mb"))
+            output_file.write("{:<30}| {:^10} | {:^10}\n".
+                              format("Process Name", "Cpu %", "Memory mb"))
             output_file.write("-------------------------------------------------------\n")
             for name in sorted(measurement_averages[host].keys()):
-                output_file.write("{:<30}| {:>10.2f} | {:>10.2f}\n".format(name, measurement_averages[host][name][0],
-                                                                           measurement_averages[host][name][1]))
+                output_file.write("{:<30}| {:>10.2f} | {:>10.2f}\n".
+                                  format(name,
+                                         measurement_averages[host][name][0],
+                                         measurement_averages[host][name][1]))
 
 if __name__ == "__main__":
     sys.exit(query_measurement_average())
