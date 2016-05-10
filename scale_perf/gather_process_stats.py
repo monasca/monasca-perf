@@ -49,6 +49,10 @@ def get_measurements_average(mon_client, start_time, metric_name, dimensions, en
     else:
         measurements = mon_client.metrics.list_measurements(start_time=start_time, name=metric_name,
                                                             dimensions=dimensions)
+    if not measurements:
+        print("no measurements for {}".format(metric_name))
+	return -1
+
     values = []
     for m in measurements[0]['measurements']:
         values.append(m[1])
@@ -72,6 +76,11 @@ def query_measurement_average():
 
     for metric in metric_data:
         dimensions = metric['dimensions']
+
+        host = dimensions['hostname']
+        proc = dimensions['process_name']
+        print("{} | {}".format(host, proc))
+
         if dimensions['hostname'] not in measurement_averages:
             measurement_averages[dimensions['hostname']] = {}
 
@@ -87,8 +96,6 @@ def query_measurement_average():
                                                dimensions,
                                                args.endtime)
 
-        host = dimensions['hostname']
-        proc = dimensions['process_name']
         measurement_averages[host][proc] = [cpu_average, mem_average]
 
     for host in measurement_averages.keys():
