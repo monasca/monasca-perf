@@ -8,7 +8,7 @@ keystone = {
     'username': 'mini-mon',
     'password': 'password',
     'project': 'test',
-    'auth_url': 'http://192.168.10.5:35357/v3'
+    'auth_url': 'http://192.168.10.6:35357/v3'
 }
 
 if len(sys.argv) >= 2:
