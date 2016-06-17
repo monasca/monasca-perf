@@ -59,6 +59,11 @@ def_list = []
 dims_list = []
 meas_list = []
 
+def_dims_temp = open(DEF_DIMS_FILENAME, 'w')
+def_temp = open(DEFINITIONS_FILENAME, 'w')
+dims_temp = open(DIMENSIIONS_FILENAME, 'w')
+meas_temp = open(MEASUREMENTS_FILENAME, 'w')
+
 ID_SIZE = 20
 
 
@@ -108,27 +113,19 @@ def set_dimension_values(active_dimensions, base_dimensions, day, hour, definiti
 
 def flush_data():
     global def_dims_list
-    def_dims_temp = open(DEF_DIMS_FILENAME, 'w')
-    def_dims_temp.write('\n'.join(def_dims_list))
-    def_dims_temp.close()
+    def_dims_temp.write('\n'.join(def_dims_list) + '\n')
     def_dims_list = []
 
     global def_list
-    def_temp = open(DEFINITIONS_FILENAME, 'w')
-    def_temp.write('\n'.join(def_list))
-    def_temp.close()
+    def_temp.write('\n'.join(def_list) + '\n')
     def_list = []
 
     global dims_list
-    dims_temp = open(DIMENSIIONS_FILENAME, 'w')
-    dims_temp.write('\n'.join(dims_list))
-    dims_temp.close()
+    dims_temp.write('\n'.join(dims_list) + '\n')
     dims_list = []
 
     global meas_list
-    meas_temp = open(MEASUREMENTS_FILENAME, 'w')
-    meas_temp.write('\n'.join(meas_list))
-    meas_temp.close()
+    meas_temp.write('\n'.join(meas_list) + '\n')
     meas_list = []
 
 
@@ -157,6 +154,8 @@ def fill_metrics(number_of_days, definitions_per_hour):
             if len(def_dims_list) > TOTAL_ACTIVE_DEFINITIONS:
                 flush_data()
 
+    flush_data()
+
     return id_list
 
 
@@ -183,6 +182,10 @@ def vertica_db_filler():
     print("Creating metric history for the past {} days".format(NUMBER_OF_DAYS))
     ids = fill_metrics(NUMBER_OF_DAYS, DEFINITIONS_PER_HOUR)
     print("  Created {} definitions total".format(len(ids)))
+    def_dims_temp.close()
+    def_temp.close()
+    dims_temp.close()
+    meas_temp.close()
     print("Writing to vertica")
     query = COPY_QUERY.format(DEF_DIMS_FILENAME,
                               DEFINITIONS_FILENAME,
@@ -191,13 +194,13 @@ def vertica_db_filler():
     run_query(query)
 
     print("Checking if data arrived...")
-    print("  DefinitionDimensions")
+    print(" DefinitionDimensions")
     print(run_query("SELECT count(*) FROM MonMetrics.DefinitionDimensions;"))
-    print("  Definitions")
+    print(" Definitions")
     print(run_query("SELECT count(*) FROM MonMetrics.Definitions;"))
-    print("  Dimensions")
+    print(" Dimensions")
     print(run_query("SELECT count(*) FROM MonMetrics.Dimensions;"))
-    print("  Measurements")
+    print(" Measurements")
     print(run_query("SELECT count(*) FROM MonMetrics.Measurements;"))
 
     print('Finished loading DB')
@@ -210,4 +213,8 @@ if __name__ == "__main__":
     except Exception as e:
         print(e)
     finally:
+        def_dims_temp.close()
+        def_temp.close()
+        dims_temp.close()
+        meas_temp.close()
         sys.exit(return_code)
