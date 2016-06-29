@@ -1,0 +1,112 @@
+{
+
+  "mem.total_mb": {
+    "name": "mem.total_mb",
+    "dimensions": {
+      "service": "random.choice(service_list)",
+      "hostname": "random.choice(host_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "cluster": "random.choice(cluster_list)",
+      "cloud_name": "random.choice(cloud_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": 64164.0
+  },
+  "mem.usable_mb": {
+    "name": "mem.usable_mb",
+    "dimensions": {
+      "service": "random.choice(service_list)",
+      "hostname": "random.choice(host_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "cluster": "random.choice(cluster_list)",
+      "cloud_name": "random.choice(cloud_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "round(random.randrange(40000,55000),1)"
+  },
+  "vm.cpu.utilization_perc": {
+    "name": "vm.cpu.utilization_perc",
+    "dimensions": {
+      "resource_id": "random.choice(resource_id_list)",
+      "cloud_name": "random.choice(cloud_name_list)",
+      "component": "random.choice(component_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)",
+      "tenant_id": "random.choice(tenant_id_list)",
+      "zone": "random.choice(zone_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": 3.0
+  },
+  "cpu.idle_perc": {
+    "name": "cpu.idle_perc",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "round(random.randrange(60,99),1)"
+  },
+  "cpu.total_logical_cores": {
+    "name": "cpu.total_logical_cores",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.choice([12.0,16.0,24.0])"
+  },
+  "disk.total_used_space_mb": {
+    "name": "cpu.total_logical_cores",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.randrange(2500,2800)"
+  },
+  "nova.vm.disk.total_allocated_gb": {
+    "name": "nova.vm.disk.total_allocated_gb",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "component": "random.choice(component_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.choice([51.0,101.0, 142.0,152.0, 182.0, 252.0])"
+  },
+  "swiftlm.diskusage.host.val.size": {
+    "name": "swiftlm.diskusage.host.val.size",
+    "dimensions": {
+      "cloud_name": "random.choice(component_list)",
+      "mount": "/srv/node/disk0",
+      "control_plane": "random.choice(control_plane_list)",
+      "device": "/dev/sdb1",
+      "service": "object-storage",
+      "hostname": "ceil-cp1-swobj0003-mgmt",
+      "cluster": "swobj",
+      "label": "---NA---"
+    },
+    "timestamp": "get_timestamp()",
+    "value": 2.998175744E11
+  }
+}
+
+
+
+
+

@@ -6,6 +6,9 @@ import multiprocessing
 import argparse
 import yaml
 
+
+import metric_simulator
+
 from monascaclient import client
 from monascaclient import ksclient
 from monascaclient import exc
@@ -13,6 +16,7 @@ from monascaclient import exc
 wait_time = 30
 
 number_of_metrics = 1310
+
 
 
 class AgentInfo:
@@ -43,7 +47,11 @@ def get_token(keystone):
     return ks_client.token
 
 
+
+
 def create_metric_list(process_number):
+
+
     metrics = []
     for i in xrange(number_of_metrics):
         epoch = (int)(time.time()) - 120
@@ -60,7 +68,20 @@ def create_metric_list(process_number):
                                        "cloud_name": "monasca"},
                         "timestamp": epoch * 1000,
                         "value": i})
+
+    # can make it an argument
+    percentage_of_known_metrics = 10
+    known_metric_generator = metric_simulator.generate_metrics()
+
+    # insert known metrics randomly into dummy metrics.
+    # known_metric_generator can generate known_metrics indefinitely
+    for _ in xrange(number_of_metrics * percentage_of_known_metrics /100):
+        insert_position = random.randint(0,number_of_metrics-1)
+        known_metric = known_metric_generator.next()
+        metrics.insert(insert_position, known_metric)
+
     return metrics
+
 
 
 def send_metrics(agent_info, process_number):
