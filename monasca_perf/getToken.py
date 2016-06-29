@@ -7,7 +7,9 @@ from monascaclient import ksclient
 keystone = {
     'username': 'mini-mon',
     'password': 'password',
-    'project': 'test',
+    'project_name': 'mini-mon',
+    'project_domain_name': 'default',
+    'user_domain_name': 'default',
     'auth_url': 'http://192.168.10.6:35357/v3'
 }
 
