@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import random
 import subprocess
 import sys
@@ -12,11 +13,11 @@ import sys
 # Clear the current metrics from the DB for testing
 CLEAR_METRICS = True
 # Total definitions active at one time
-TOTAL_ACTIVE_DEFINITIONS = 10
+TOTAL_ACTIVE_DEFINITIONS = 8000
 # Number of new metric definitions per hour
-DEFINITIONS_PER_HOUR = 1
+DEFINITIONS_PER_HOUR = 800
 # will fill x number days backwards from current day including current day
-NUMBER_OF_DAYS = 2
+NUMBER_OF_DAYS = 10
 
 # Each new definition set will have 'unique_key' with a unique value. Add other dimensions
 # with dynamic values {day} {hour} {definition}
@@ -50,10 +51,6 @@ CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
              }
 
-current_def_dims_id = 1
-current_definition_id = 1
-current_dimension_set_id = 1
-
 def_dims_list = {}
 def_list = {}
 dims_list = {}
@@ -75,17 +72,21 @@ def add_measurement(def_dim_id, timestamp):
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
                         def_dim_id=None, definition_id=None, dimension_set_id=None):
-    global current_def_dims_id
-    if def_dim_id is None:
-        def_dim_id = str(len(def_dims_list.keys())).rjust(ID_SIZE, '0')
 
-    global current_definition_id
     if definition_id is None:
-        definition_id = str(len(def_list.keys())).rjust(ID_SIZE, '0')
+        id_hash = hashlib.sha1()
+        id_hash.update(str(name) + str(tenant_id) + str(region))
+        definition_id = id_hash.hexdigest()
 
-    global current_dimension_set_id
     if dimension_set_id is None:
-        dimension_set_id = str(len(dims_list.keys())).rjust(ID_SIZE, '0')
+        id_hash = hashlib.sha1()
+        id_hash.update(','.join([str(key) + '=' + str(dimensions[key]) for key in dimensions.keys()]))
+        dimension_set_id = id_hash.hexdigest()
+
+    if def_dim_id is None:
+        id_hash = hashlib.sha1()
+        id_hash.update(str(definition_id) + str(dimension_set_id))
+        def_dim_id = id_hash.hexdigest()
 
     def_list[(name, tenant_id, region)] = ','.join([definition_id, name, tenant_id, region])
     add_dimension_set(dimensions, dimension_set_id)
