@@ -17,7 +17,11 @@ TOTAL_ACTIVE_DEFINITIONS = 8000
 # Number of new metric definitions per hour
 DEFINITIONS_PER_HOUR = 800
 # will fill x number days backwards from current day including current day
-NUMBER_OF_DAYS = 10
+NUMBER_OF_DAYS = 45
+
+CONN_INFO = {'user': 'dbadmin',
+             'password': 'password'
+             }
 
 # Each new definition set will have 'unique_key' with a unique value. Add other dimensions
 # with dynamic values {day} {hour} {definition}
@@ -47,14 +51,13 @@ COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_se
              "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
              "DELIMITER ',' COMMIT; "
 
-CONN_INFO = {'user': 'dbadmin',
-             'password': 'password'
-             }
-
-def_dims_list = {}
-def_list = {}
-dims_list = {}
-meas_list = {}
+def_id_set = set()
+dim_id_set = set()
+def_dim_id_set = set()
+def_list = []
+dims_list = []
+def_dims_list = []
+meas_list = []
 
 def_dims_temp = open(DEF_DIMS_FILENAME, 'w')
 def_temp = open(DEFINITIONS_FILENAME, 'w')
@@ -67,7 +70,7 @@ ID_SIZE = 20
 def add_measurement(def_dim_id, timestamp):
     formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
     value = str(random.randint(0, 1000000))
-    meas_list[(formatted_timestamp, value)] = ','.join([def_dim_id, formatted_timestamp, value]) + '\n'
+    meas_list.append(','.join([def_dim_id, formatted_timestamp, value]) + '\n')
 
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
@@ -78,19 +81,27 @@ def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1
         id_hash.update(str(name) + str(tenant_id) + str(region))
         definition_id = id_hash.hexdigest()
 
+    if definition_id not in def_id_set:
+        def_list.append(','.join([definition_id, name, tenant_id, region]))
+        def_id_set.add(definition_id)
+
     if dimension_set_id is None:
         id_hash = hashlib.sha1()
         id_hash.update(','.join([str(key) + '=' + str(dimensions[key]) for key in dimensions.keys()]))
         dimension_set_id = id_hash.hexdigest()
+
+    if dimension_set_id not in dim_id_set:
+        add_dimension_set(dimensions, dimension_set_id)
+        dim_id_set.add(dimension_set_id)
 
     if def_dim_id is None:
         id_hash = hashlib.sha1()
         id_hash.update(str(definition_id) + str(dimension_set_id))
         def_dim_id = id_hash.hexdigest()
 
-    def_list[(name, tenant_id, region)] = ','.join([definition_id, name, tenant_id, region])
-    add_dimension_set(dimensions, dimension_set_id)
-    def_dims_list[(definition_id, dimension_set_id)] = ','.join([def_dim_id, definition_id, dimension_set_id])
+    if def_dim_id not in def_dim_id_set:
+        def_dims_list.append(','.join([def_dim_id, definition_id, dimension_set_id]))
+        def_dim_id_set.add(def_dim_id)
 
     return def_dim_id
 
@@ -100,9 +111,7 @@ def add_dimension_set(dimensions, dimension_set_id):
     for key in dimensions.iterkeys():
         data.append(','.join([dimension_set_id, key, dimensions[key]]))
 
-    keys = tuple(dimensions.keys())
-    values = tuple(dimensions.values())
-    dims_list[(keys, values)] = '\n'.join(data)
+    dims_list.append('\n'.join(data))
 
 
 def set_dimension_values(active_dimensions, base_dimensions, day, hour, definition):
@@ -114,20 +123,20 @@ def set_dimension_values(active_dimensions, base_dimensions, day, hour, definiti
 
 def flush_data():
     global def_dims_list
-    def_dims_temp.write('\n'.join(def_dims_list.values()) + '\n')
-    def_dims_list = {}
+    def_dims_temp.write('\n'.join(def_dims_list) + '\n')
+    def_dims_list = []
 
     global def_list
-    def_temp.write('\n'.join(def_list.values()) + '\n')
-    def_list = {}
+    def_temp.write('\n'.join(def_list) + '\n')
+    def_list = []
 
     global dims_list
-    dims_temp.write('\n'.join(dims_list.values()) + '\n')
-    dims_list = {}
+    dims_temp.write('\n'.join(dims_list) + '\n')
+    dims_list = []
 
     global meas_list
-    meas_temp.write('\n'.join(meas_list.values()) + '\n')
-    meas_list = {}
+    meas_temp.write('\n'.join(meas_list) + '\n')
+    meas_list = []
 
 
 def fill_metrics(number_of_days, definitions_per_hour):
@@ -151,6 +160,9 @@ def fill_metrics(number_of_days, definitions_per_hour):
             for m_id in active_ids:
                 timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=x, hours=y)
                 add_measurement(m_id, timestamp)
+
+            if len(def_dims_list) > TOTAL_ACTIVE_DEFINITIONS:
+                flush_data()
 
     flush_data()
 
