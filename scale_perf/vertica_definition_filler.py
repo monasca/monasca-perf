@@ -13,11 +13,11 @@ import sys
 # Clear the current metrics from the DB for testing
 CLEAR_METRICS = True
 # Total definitions active at one time
-TOTAL_ACTIVE_DEFINITIONS = 800
+TOTAL_ACTIVE_DEFINITIONS = 8000
 # Number of new metric definitions per hour
 NEW_VMS_PER_HOUR = 80
 # will fill x number days backwards from current day including current day
-NUMBER_OF_DAYS = 10
+NUMBER_OF_DAYS = 1
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
@@ -83,7 +83,8 @@ class vmSimulator(object):
             "component": "vm",
             "hostname": "test_vm_host_" + str(resource_id)
         }
-        self.disks = ["sda", "sdb", "sdc", "sdd"]
+        self.disks = ['sda', 'sdb', 'sdc']
+        self.vswitches = ['vs1', 'vs2', 'vs3']
         self.network_devices = ['tap1']
         self.metric_names = ["cpu.utilization_norm_perc",
                              "cpu.utilization_perc",
@@ -137,28 +138,74 @@ class vmSimulator(object):
                              "vm.net.out_bytes",
                              "vm.net.out_bytes_sec",
                              "vm.net.out_packets",
-                             "vm.net.out_packets_sec"]
+                             "vm.net.out_packets_sec",
+                             "vswitch.in_bytes",
+                             "vswitch.in_bytes_sec",
+                             # "vswitch.in_bits",
+                             # "vswitch.in_bits_sec",
+                             "vswitch.in_packets",
+                             "vswitch.in_packets_sec",
+                             "vswitch.in_dropped",
+                             "vswitch.in_dropped_sec",
+                             "vswitch.in_errors",
+                             "vswitch.in_errors_sec",
+                             "vswitch.out_bytes",
+                             "vswitch.out_bytes_sec",
+                             # "vswitch.out_bits",
+                             # "vswitch.out_bits_sec",
+                             "vswitch.out_packets",
+                             "vswitch.out_packets_sec",
+                             "vswitch.out_dropped",
+                             "vswitch.out_dropped_sec",
+                             "vswitch.out_errors",
+                             "vswitch.out_errors_sec",
+                             "vm.vswitch.in_bytes",
+                             "vm.vswitch.in_bytes_sec",
+                             # "vm.vswitch.in_bits",
+                             # "vm.vswitch.in_bits_sec",
+                             "vm.vswitch.in_packets",
+                             "vm.vswitch.in_packets_sec",
+                             "vm.vswitch.in_dropped",
+                             "vm.vswitch.in_dropped_sec",
+                             "vm.vswitch.in_errors",
+                             "vm.vswitch.in_errors_sec",
+                             "vm.vswitch.out_bytes",
+                             "vm.vswitch.out_bytes_sec",
+                             # "vm.vswitch.out_bits",
+                             # "vm.vswitch.out_bits_sec",
+                             "vm.vswitch.out_packets",
+                             "vm.vswitch.out_packets_sec",
+                             "vm.vswitch.out_dropped",
+                             "vm.vswitch.out_dropped_sec",
+                             "vm.vswitch.out_errors",
+                             "vm.vswitch.out_errors_sec"]
 
     def create_metrics(self):
         for name in self.metric_names:
             dimensions = self.base_dimensions.copy()
             if name.startswith('vm.'):
                 dimensions['tenant_id'] = self.vm_tenant_id
-            if 'disk' in name:
+            if 'disk.' in name:
                 for disk in self.disks:
                     dimensions['device'] = disk
                     yield (name, dimensions)
                 continue
 
-            if 'io' in name and 'total' not in name:
+            if 'io.' in name and 'total' not in name:
                 for disk in self.disks:
                     dimensions['device'] = disk
                     yield (name, dimensions)
                 continue
 
-            if 'net' in name:
+            if 'net.' in name:
                 for device in self.network_devices:
                     dimensions['device'] = device
+                    yield (name, dimensions)
+                continue
+
+            if 'vswitch.' in name:
+                for switch in self.vswitches:
+                    dimensions['device'] = switch
                     yield (name, dimensions)
                 continue
 
