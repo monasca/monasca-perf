@@ -4,10 +4,8 @@ import random
 import subprocess
 import sys
 
-""" vertica_db_filler
-    Run this after simulating the number of nodes, or in a performance testing configuration
-    that has the desired number of metric definitions.
-    This will use the existing dimensions in the DB to add measurements for each metric definition.
+""" vertica_definition_filler
+    This will simulate a number of days worth of metric definition history.
 """
 
 # Clear the current metrics from the DB for testing
@@ -88,16 +86,42 @@ class vmSimulator(object):
         self.network_devices = ['tap1']
         self.metric_names = ["cpu.utilization_norm_perc",
                              "cpu.utilization_perc",
+                             "disk.allocation",
+                             "disk.allocation_total",
+                             "disk.capacity",
+                             "disk.capacity_total",
                              "disk.ephemeral.size",
+                             "disk.physical",
+                             "disk.physical_total",
                              "disk.root.size",
                              "host_alive_status",
                              "instance",
+                             "io.errors",
                              "io.errors_sec",
+                             "io.errors_total",
+                             "io.errors_total_sec",
+                             "io.read_bytes",
                              "io.read_bytes_sec",
+                             "io.read_bytes_total",
+                             "io.read_bytes_total_sec",
+                             "io.read_ops",
                              "io.read_ops_sec",
+                             "io.read_ops_total",
+                             "io.read_ops_total_sec",
+                             "io.write_bytes",
                              "io.write_bytes_sec",
+                             "io.write_bytes_total",
+                             "io.write_bytes_total_sec",
+                             "io.write_ops",
                              "io.write_ops_sec",
+                             "io.write_ops_total",
+                             "io.write_ops_total_sec",
+                             "mem.free_mb",
+                             "mem.free_perc",
                              "memory",
+                             "mem.swap_used_mb",
+                             "mem.total_mb",
+                             "mem.used_mb",
                              "net.in_bytes",
                              "net.in_bytes_sec",
                              "net.in_packets",
@@ -106,10 +130,17 @@ class vmSimulator(object):
                              "net.out_bytes_sec",
                              "net.out_packets",
                              "net.out_packets_sec",
+                             "ping_status",
                              "vcpus",
                              "vm.cpu.time_ns",
                              "vm.cpu.utilization_norm_perc",
                              "vm.cpu.utilization_perc",
+                             "vm.disk.allocation",
+                             "vm.disk.allocation_total",
+                             "vm.disk.capacity",
+                             "vm.disk.capacity_total",
+                             "vm.disk.physical",
+                             "vm.disk.physical_total",
                              "vm.host_alive_status",
                              "vm.io.errors",
                              "vm.io.errors_sec",
@@ -131,6 +162,12 @@ class vmSimulator(object):
                              "vm.io.write_ops_sec",
                              "vm.io.write_ops_total",
                              "vm.io.write_ops_total_sec",
+                             "vm.mem.free_mb",
+                             "vm.mem.free_perc",
+                             "vm.mem.resident_mb",
+                             "vm.mem.swap_used_mb",
+                             "vm.mem.total_mb",
+                             "vm.mem.used_mb",
                              "vm.net.in_bytes",
                              "vm.net.in_bytes_sec",
                              "vm.net.in_packets",
@@ -139,26 +176,7 @@ class vmSimulator(object):
                              "vm.net.out_bytes_sec",
                              "vm.net.out_packets",
                              "vm.net.out_packets_sec",
-                             "vswitch.in_bytes",
-                             "vswitch.in_bytes_sec",
-                             # "vswitch.in_bits",
-                             # "vswitch.in_bits_sec",
-                             "vswitch.in_packets",
-                             "vswitch.in_packets_sec",
-                             "vswitch.in_dropped",
-                             "vswitch.in_dropped_sec",
-                             "vswitch.in_errors",
-                             "vswitch.in_errors_sec",
-                             "vswitch.out_bytes",
-                             "vswitch.out_bytes_sec",
-                             # "vswitch.out_bits",
-                             # "vswitch.out_bits_sec",
-                             "vswitch.out_packets",
-                             "vswitch.out_packets_sec",
-                             "vswitch.out_dropped",
-                             "vswitch.out_dropped_sec",
-                             "vswitch.out_errors",
-                             "vswitch.out_errors_sec",
+                             "vm.ping_status",
                              "vm.vswitch.in_bytes",
                              "vm.vswitch.in_bytes_sec",
                              # "vm.vswitch.in_bits",
@@ -178,14 +196,34 @@ class vmSimulator(object):
                              "vm.vswitch.out_dropped",
                              "vm.vswitch.out_dropped_sec",
                              "vm.vswitch.out_errors",
-                             "vm.vswitch.out_errors_sec"]
+                             "vm.vswitch.out_errors_sec",
+                             "vswitch.in_bytes",
+                             "vswitch.in_bytes_sec",
+                             # "vswitch.in_bits",
+                             # "vswitch.in_bits_sec",
+                             "vswitch.in_packets",
+                             "vswitch.in_packets_sec",
+                             "vswitch.in_dropped",
+                             "vswitch.in_dropped_sec",
+                             "vswitch.in_errors",
+                             "vswitch.in_errors_sec",
+                             "vswitch.out_bytes",
+                             "vswitch.out_bytes_sec",
+                             # "vswitch.out_bits",
+                             # "vswitch.out_bits_sec",
+                             "vswitch.out_packets",
+                             "vswitch.out_packets_sec",
+                             "vswitch.out_dropped",
+                             "vswitch.out_dropped_sec",
+                             "vswitch.out_errors",
+                             "vswitch.out_errors_sec"]
 
     def create_metrics(self):
         for name in self.metric_names:
             dimensions = self.base_dimensions.copy()
             if name.startswith('vm.'):
                 dimensions['tenant_id'] = self.vm_tenant_id
-            if 'disk.' in name:
+            if 'disk.' in name and 'total' not in name:
                 for disk in self.disks:
                     dimensions['device'] = disk
                     yield (name, dimensions)
