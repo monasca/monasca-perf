@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import random
+import string
 import subprocess
 import sys
 
@@ -66,10 +67,10 @@ ID_SIZE = 20
 
 class vmSimulator(object):
 
-    def __init__(self, resource_id, tenant_id, region):
+    def __init__(self, resource_id, admin_tenant_id, tenant_id, region):
         self.resource_id = resource_id
-        self.tenant_id = tenant_id or "tenant_1"
-        self.vm_tenant_id = "vm_tenant_1"
+        self.admin_tenant_id = admin_tenant_id or "tenant_1"
+        self.vm_tenant_id = tenant_id or "vm_tenant_1"
         self.region = region or "region_1"
         self.metrics = {}
         self.base_dimensions = {
@@ -84,7 +85,8 @@ class vmSimulator(object):
         self.disks = ['sda', 'sdb', 'sdc']
         self.vswitches = ['vs1', 'vs2', 'vs3']
         self.network_devices = ['tap1']
-        self.metric_names = ["cpu.utilization_norm_perc",
+        self.metric_names = ["cpu.time_ns",
+                             "cpu.utilization_norm_perc",
                              "cpu.utilization_perc",
                              "disk.allocation",
                              "disk.allocation_total",
@@ -221,33 +223,33 @@ class vmSimulator(object):
     def create_metrics(self):
         for name in self.metric_names:
             dimensions = self.base_dimensions.copy()
+            tenant_id = self.vm_tenant_id
+
             if name.startswith('vm.'):
                 dimensions['tenant_id'] = self.vm_tenant_id
+                tenant_id = self.admin_tenant_id
+
             if 'disk.' in name and 'total' not in name:
                 for disk in self.disks:
                     dimensions['device'] = disk
-                    yield (name, dimensions)
-                continue
+                    yield (name, dimensions, tenant_id)
 
-            if 'io.' in name and 'total' not in name:
+            elif 'io.' in name and 'total' not in name:
                 for disk in self.disks:
                     dimensions['device'] = disk
-                    yield (name, dimensions)
-                continue
+                    yield (name, dimensions, tenant_id)
 
-            if 'net.' in name:
+            elif 'net.' in name:
                 for device in self.network_devices:
                     dimensions['device'] = device
-                    yield (name, dimensions)
-                continue
+                    yield (name, dimensions, tenant_id)
 
-            if 'vswitch.' in name:
+            elif 'vswitch.' in name:
                 for switch in self.vswitches:
                     dimensions['device'] = switch
-                    yield (name, dimensions)
-                continue
-
-            yield (name, dimensions)
+                    yield (name, dimensions, tenant_id)
+            else:
+                yield (name, dimensions, tenant_id)
 
 
 def add_measurement(def_dim_id, timestamp):
@@ -337,6 +339,11 @@ def flush_data():
     run_query(query)
 
 
+def id_generator(size=32, chars=string.hexdigits):
+    return ''.join(random.choice(chars) for _ in range(size))
+
+
+
 def fill_metrics(number_of_days, new_vms_per_hour):
     id_list = []
     active_vms = []
@@ -351,7 +358,9 @@ def fill_metrics(number_of_days, new_vms_per_hour):
                 # new_id = add_full_definition("api-test-0", active_dimensions,
                 #                              tenant_id=TENANT_ID)
                 global next_resource_id
-                active_vms.append(vmSimulator(resource_id=next_resource_id, tenant_id=TENANT_ID,
+                active_vms.append(vmSimulator(resource_id=next_resource_id,
+                                              admin_tenant_id=TENANT_ID,
+                                              tenant_id=id_generator(),
                                               region=REGION))
                 next_resource_id += 1
 
@@ -360,7 +369,7 @@ def fill_metrics(number_of_days, new_vms_per_hour):
 
             for vm in active_vms:
                 for metric in vm.create_metrics():
-                    new_id = add_full_definition(metric[0], metric[1], vm.tenant_id, vm.region)
+                    new_id = add_full_definition(metric[0], metric[1], metric[2], vm.region)
                     timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=x, hours=y)
                     add_measurement(new_id, timestamp)
 
