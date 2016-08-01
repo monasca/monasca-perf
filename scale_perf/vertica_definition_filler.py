@@ -12,12 +12,14 @@ import time
 
 # Clear the current metrics from the DB for testing
 CLEAR_METRICS = True
+# Add metrics every 30 seconds for the full measurement load (false, send only one per hour)
+FULL_MEASUREMENTS = False
 # Total definitions active at one time
-TOTAL_ACTIVE_DEFINITIONS = 8000
+TOTAL_ACTIVE_VMS = 8000
 # Number of new metric definitions per hour
 NEW_VMS_PER_HOUR = 800
 # will fill x number days backwards from current day including current day
-NUMBER_OF_DAYS = 2
+NUMBER_OF_DAYS = 45
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
@@ -54,6 +56,7 @@ def_dims_list = []
 meas_list = []
 
 next_resource_id = 1
+measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
 
 ID_SIZE = 20
 TOTAL_VM_TENANTS = 256
@@ -398,13 +401,14 @@ def fill_metrics(number_of_days, new_vms_per_hour):
                                               region=REGION))
                 next_resource_id += 1
 
-            if len(active_vms) > TOTAL_ACTIVE_DEFINITIONS:
+            if len(active_vms) > TOTAL_ACTIVE_VMS:
                 active_vms = active_vms[new_vms_per_hour:]
 
-            for vm in active_vms:
-                for metric_id in vm.get_metric_ids():
-                    timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=x, hours=y)
-                    add_measurement(metric_id, timestamp)
+            for zz in xrange(measurements_per_hour):
+                for vm in active_vms:
+                    for metric_id in vm.get_metric_ids():
+                        timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=x, hours=y, seconds=(30 * zz))
+                        add_measurement(metric_id, timestamp)
 
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
                 flush_data()
