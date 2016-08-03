@@ -1,3 +1,4 @@
+import cProfile
 import datetime
 import hashlib
 import random
@@ -18,7 +19,7 @@ FULL_MEASUREMENTS = False
 TOTAL_ACTIVE_VMS = 8000
 # Number of new metric definitions per hour
 NEW_VMS_PER_HOUR = 800
-# will fill x number days backwards from current day including current day
+# will fill starting from X days ago to present (when the script started)
 NUMBER_OF_DAYS = 45
 
 CONN_INFO = {'user': 'dbadmin',
@@ -26,7 +27,7 @@ CONN_INFO = {'user': 'dbadmin',
              }
 
 # Tenant id to report metrics under
-TENANT_ID = "7e04ac703b024275aca4a9b3203847c8"
+TENANT_ID = "a314fc7078354b8d95264b3efcbacbe8"
 # Region in which to report metrics
 REGION = "Region 1"
 
@@ -38,14 +39,14 @@ DIMENSIIONS_FILENAME = '/tmp/dimensions.dat'
 
 MEASUREMENTS_FILENAME = '/tmp/measurements.dat'
 
-COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
-             "DELIMITER ',' COMMIT; " \
-             "COPY MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
-             "DELIMITER ',' COMMIT; " \
-             "COPY MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
-             "DELIMITER ',' COMMIT; " \
-             "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
-             "DELIMITER ',' COMMIT; "
+DEFINITION_COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
+                        "DELIMITER ',' COMMIT; " \
+                        "COPY MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
+                        "DELIMITER ',' COMMIT; " \
+                        "COPY MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
+                        "DELIMITER ',' COMMIT; "
+MEASUREMENT_COPY_QUERY = "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
+                         "DELIMITER ',' COMMIT; "
 
 def_id_set = set()
 dim_id_set = set()
@@ -295,9 +296,8 @@ class vmSimulator(object):
 
 
 def add_measurement(def_dim_id, timestamp):
-    formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
     value = str(random.randint(0, 1000000))
-    meas_list.append(','.join([def_dim_id, formatted_timestamp, value]) + '\n')
+    meas_list.append(','.join([def_dim_id, timestamp, value]) + '\n')
 
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
@@ -347,7 +347,7 @@ def set_dimension_values(active_dimensions, base_dimensions, day, hour, definiti
                                                              definition=definition)
 
 
-def flush_data():
+def flush_definition_data():
     global def_dims_list
     def_dims_temp = open(DEF_DIMS_FILENAME, 'w')
     def_dims_temp.write('\n'.join(def_dims_list) + '\n')
@@ -366,17 +366,21 @@ def flush_data():
     dims_temp.close()
     dims_list = []
 
+    query = DEFINITION_COPY_QUERY.format(DEF_DIMS_FILENAME,
+                                         DEFINITIONS_FILENAME,
+                                         DIMENSIIONS_FILENAME)
+    run_query(query)
+
+
+def flush_measurement_data():
     global meas_list
     meas_temp = open(MEASUREMENTS_FILENAME, 'w')
     meas_temp.write('\n'.join(meas_list) + '\n')
     meas_temp.close()
     meas_list = []
 
-    print("Writing to vertica")
-    query = COPY_QUERY.format(DEF_DIMS_FILENAME,
-                              DEFINITIONS_FILENAME,
-                              DIMENSIIONS_FILENAME,
-                              MEASUREMENTS_FILENAME)
+    query = MEASUREMENT_COPY_QUERY.format(MEASUREMENTS_FILENAME)
+
     run_query(query)
 
 
@@ -391,6 +395,7 @@ def fill_metrics(number_of_days, new_vms_per_hour):
 
     active_vms = []
     start_time = time.time()
+    base_timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=NUMBER_OF_DAYS)
     for x in xrange(number_of_days):
         for y in xrange(24):
             for z in xrange(new_vms_per_hour):
@@ -405,17 +410,27 @@ def fill_metrics(number_of_days, new_vms_per_hour):
                 active_vms = active_vms[new_vms_per_hour:]
 
             for zz in xrange(measurements_per_hour):
+                timestamp = base_timestamp + datetime.timedelta(days=x, hours=y, seconds=(30 * zz))
+                formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
                 for vm in active_vms:
                     for metric_id in vm.get_metric_ids():
-                        timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=x, hours=y, seconds=(30 * zz))
-                        add_measurement(metric_id, timestamp)
+                        add_measurement(metric_id, formatted_timestamp)
+                        if FULL_MEASUREMENTS and len(meas_list) > (LOCAL_STORAGE_MAX * 10):
+                            print("Flushing Measurements")
+                            num_measurements = len(meas_list)
+                            flush_measurement_data()
+                            time_delta = (time.time() - start_time)
+                            print("{0:.0f} measurements / sec".format(num_measurements / time_delta))
 
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
-                flush_data()
-                print("{0:.0f} / sec".format(len(def_dim_id_set) / (time.time() - start_time)))
+                print("Flushing Definitions")
+                flush_definition_data()
+                time_delta = (time.time() - start_time)
+                print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
                 print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
-    flush_data()
+    flush_definition_data()
+    flush_measurement_data()
 
 
 def run_query(query):
@@ -439,7 +454,7 @@ def vertica_db_filler():
 
     # print("New definitions per day: {}".format(definitions_per_day))
     print("Creating metric history for the past {} days".format(NUMBER_OF_DAYS))
-    fill_metrics(NUMBER_OF_DAYS, NEW_VMS_PER_HOUR)
+    cProfile.run('fill_metrics(NUMBER_OF_DAYS, NEW_VMS_PER_HOUR)')
     print("  Created {} definitions total".format(len(def_dim_id_set)))
 
     print("Checking if data arrived...")
