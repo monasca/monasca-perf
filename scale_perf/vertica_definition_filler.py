@@ -1,6 +1,8 @@
 import cProfile
 import datetime
 import hashlib
+from multiprocessing import Pool
+import os
 import random
 import string
 import subprocess
@@ -16,18 +18,18 @@ CLEAR_METRICS = True
 # Add metrics every 30 seconds for the full measurement load (false, send only one per hour)
 FULL_MEASUREMENTS = False
 # Total definitions active at one time
-TOTAL_ACTIVE_VMS = 8000
+TOTAL_ACTIVE_VMS = 800
 # Number of new metric definitions per hour
-NEW_VMS_PER_HOUR = 800
+NEW_VMS_PER_HOUR = 80
 # will fill starting from X days ago to present (when the script started)
-NUMBER_OF_DAYS = 45
+NUMBER_OF_DAYS = 2
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
              }
 
 # Tenant id to report metrics under
-TENANT_ID = "a314fc7078354b8d95264b3efcbacbe8"
+TENANT_ID = "bcd704b1439e4771b073b83c3a6c423b"
 # Region in which to report metrics
 REGION = "Region 1"
 
@@ -54,7 +56,9 @@ def_dim_id_set = set()
 def_list = []
 dims_list = []
 def_dims_list = []
-meas_list = []
+
+measurement_process_id = 0
+total_measurement_processes = 5
 
 next_resource_id = 1
 measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
@@ -295,9 +299,13 @@ class vmSimulator(object):
         return base_defs + disk_defs + network_defs + vswitch_defs
 
 
-def add_measurement(def_dim_id, timestamp):
-    value = str(random.randint(0, 1000000))
-    meas_list.append(','.join([def_dim_id, timestamp, value]) + '\n')
+def add_measurement_batch(id_list, timestamp, filename):
+    meas_list = []
+    for metric_id in id_list:
+        value = str(random.randint(0, 1000000))
+        meas_list.append(','.join([metric_id, timestamp, value]) + '\n')
+
+    flush_measurement_data(meas_list, filename)
 
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
@@ -372,16 +380,16 @@ def flush_definition_data():
     run_query(query)
 
 
-def flush_measurement_data():
-    global meas_list
-    meas_temp = open(MEASUREMENTS_FILENAME, 'w')
+def flush_measurement_data(meas_list, filename):
+    meas_temp = open(filename, 'w')
     meas_temp.write('\n'.join(meas_list) + '\n')
     meas_temp.close()
-    meas_list = []
 
-    query = MEASUREMENT_COPY_QUERY.format(MEASUREMENTS_FILENAME)
+    query = MEASUREMENT_COPY_QUERY.format(filename)
 
     run_query(query)
+
+    os.remove(filename)
 
 
 def id_generator(size=32, chars=string.hexdigits):
@@ -389,6 +397,8 @@ def id_generator(size=32, chars=string.hexdigits):
 
 
 def fill_metrics(number_of_days, new_vms_per_hour):
+    measurement_process_pool = Pool(total_measurement_processes)
+
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
     metrics_per_vm = vmSimulator.get_total_metric_defs()
     expected_definitions = NUMBER_OF_DAYS * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
@@ -412,15 +422,16 @@ def fill_metrics(number_of_days, new_vms_per_hour):
             for zz in xrange(measurements_per_hour):
                 timestamp = base_timestamp + datetime.timedelta(days=x, hours=y, seconds=(30 * zz))
                 formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                metric_ids = []
                 for vm in active_vms:
-                    for metric_id in vm.get_metric_ids():
-                        add_measurement(metric_id, formatted_timestamp)
-                        if FULL_MEASUREMENTS and len(meas_list) > (LOCAL_STORAGE_MAX * 10):
-                            print("Flushing Measurements")
-                            num_measurements = len(meas_list)
-                            flush_measurement_data()
-                            time_delta = (time.time() - start_time)
-                            print("{0:.0f} measurements / sec".format(num_measurements / time_delta))
+                    metric_ids.extend(vm.get_metric_ids())
+
+                global measurement_process_id
+                measurement_process_pool.apply_async(add_measurement_batch,
+                                                     args=(metric_ids,
+                                                           formatted_timestamp,
+                                                           MEASUREMENTS_FILENAME + str(measurement_process_id,)))
+                measurement_process_id += 1
 
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
                 print("Flushing Definitions")
@@ -430,7 +441,8 @@ def fill_metrics(number_of_days, new_vms_per_hour):
                 print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
     flush_definition_data()
-    flush_measurement_data()
+    measurement_process_pool.close()
+    measurement_process_pool.join()
 
 
 def run_query(query):
@@ -454,7 +466,7 @@ def vertica_db_filler():
 
     # print("New definitions per day: {}".format(definitions_per_day))
     print("Creating metric history for the past {} days".format(NUMBER_OF_DAYS))
-    cProfile.run('fill_metrics(NUMBER_OF_DAYS, NEW_VMS_PER_HOUR)')
+    fill_metrics(NUMBER_OF_DAYS, NEW_VMS_PER_HOUR)
     print("  Created {} definitions total".format(len(def_dim_id_set)))
 
     print("Checking if data arrived...")
