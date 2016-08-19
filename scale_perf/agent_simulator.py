@@ -1,25 +1,23 @@
+import argparse
+
+import multiprocessing
 import random
 import socket
 import sys
 import time
-import multiprocessing
-import argparse
+import uuid
 import yaml
 
-
-import metric_simulator
+# import metric_simulator
 
 from monascaclient import client
-from monascaclient import ksclient
 from monascaclient import exc
+from monascaclient import ksclient
 
 wait_time = 30
 
-number_of_metrics = 1310
 
-
-
-class AgentInfo:
+class AgentInfo(object):
 
     def __init__(self):
         pass
@@ -28,13 +26,98 @@ class AgentInfo:
     monasca_url = ''
 
 
+class VM(object):
+    """245 metrics per VM"""
+
+    def __init__(self, process_id):
+        self._unique = uuid.uuid1()
+        self._num_metrics = 245
+        self._num_disks = 3
+        self._num_dpdk_ports = 3
+        self._num_vnics = 1
+
+        self._metrics = []
+        for i in xrange(self._num_metrics):
+            self._metrics.append(metric_create("VM-{}".format(i),
+                                               self._unique,
+                                               process_id))
+
+    def flush(self):
+        return self._metrics
+
+
+class ComputeNode(object):
+    """169 metrics per compute node"""
+    def __init__(self, process_id):
+        self._unique = uuid.uuid1()
+
+        self._num_metrics = 169
+        self._num_vms = 40
+
+        self._vms = []
+        for i in xrange(self._num_vms):
+            self._vms.append(VM())
+
+        self._metrics = []
+        for i in xrange(self._num_metrics):
+            self._metrics.append(metric_create("ComputeNode-{}".format(i),
+                                               self._unique,
+                                               process_id))
+
+    def flush(self):
+        result = []
+        result.extend(self._metrics)
+        for vm in self._vms():
+            result.extend(vm.flush())
+
+
+class ControlPlane(object):
+    """804 metrics per control plane"""
+    def __init__(self, process_id):
+        self._unique = uuid.uuid1()
+        self._num_metrics = 804
+
+        self._metrics = []
+        for i in xrange(self._num_metrics):
+            self._metrics.append(metric_create("ControlPlane-{}".format(i),
+                                               self._unique,
+                                               process_id))
+
+    def flush(self):
+        return self._metrics
+
+
+def metric_create(name, uniqueness, process_number):
+    epoch = (int)(time.time()) - 120
+    return {"name": name,
+            "timestamp": epoch * 1000,
+            "value": random.randint(1, 100),
+            "dimensions": {"perf-id": str(process_number),
+                           "zone": "nova",
+                           "service": "compute",
+                           "uniqueness": uniqueness,
+                           "resource_id": "34c0ce14-9ce4-4d3d-84a4-172e1ddb26c4",
+                           "tenant_id": "71fea2331bae4d98bb08df071169806d",
+                           "hostname": socket.gethostname(),
+                           "component": "vm",
+                           "control_plane": "ccp",
+                           "cluster": "compute",
+                           "cloud_name": "monasca"}}
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--number_agents", help="Number of agents to emulate sending metrics to the API", type=int,
-                        required=False, default=30)
+    parser.add_argument("--number_agents",
+                        help="Number of agents to emulate sending metrics to the API",
+                        type=int,
+                        required=False,
+                        default=30)
     parser.add_argument("--run_time",
-                        help="How long, in mins, collection will run. Defaults to run indefinitely until the user hits"
-                             " control c", required=False, type=int, default=None)
+                        help="How long, in mins, collection will run."
+                             "Defaults to run indefinitely until the user hits control c",
+                        required=False,
+                        type=int,
+                        default=None)
     return parser.parse_args()
 
 
@@ -42,50 +125,49 @@ def get_token(keystone):
     try:
         ks_client = ksclient.KSClient(**keystone)
     except Exception as ex:
-        print 'Failed to authenticate: {}'.format(ex)
+        print('Failed to authenticate: {}'.format(ex))
         return None
     return ks_client.token
 
 
-
-
-def create_metric_list(process_number):
-
-
-    metrics = []
-    for i in xrange(number_of_metrics):
-        epoch = (int)(time.time()) - 120
-        metrics.append({"name": "perf-parallel-" + str(i),
-                        "dimensions": {"perf-id": str(process_number),
-                                       "zone": "nova",
-                                       "service": "compute",
-                                       "resource_id": "34c0ce14-9ce4-4d3d-84a4-172e1ddb26c4",
-                                       "tenant_id": "71fea2331bae4d98bb08df071169806d",
-                                       "hostname": socket.gethostname(),
-                                       "component": "vm",
-                                       "control_plane": "ccp",
-                                       "cluster": "compute",
-                                       "cloud_name": "monasca"},
-                        "timestamp": epoch * 1000,
-                        "value": i})
-
-    # can make it an argument
-    percentage_of_known_metrics = 10
-    known_metric_generator = metric_simulator.generate_metrics()
-
-    # insert known metrics randomly into dummy metrics.
-    # known_metric_generator can generate known_metrics indefinitely
-    for _ in xrange(number_of_metrics * percentage_of_known_metrics /100):
-        insert_position = random.randint(0,number_of_metrics-1)
-        known_metric = known_metric_generator.next()
-        metrics.insert(insert_position, known_metric)
-
-    return metrics
-
+# def create_metric_list(process_number):
+#    metrics = []
+#    for i in xrange(number_of_metrics):
+#        epoch = (int)(time.time()) - 120
+#        metrics.append({"name": "perf-parallel-" + str(i),
+#                        "dimensions": {"perf-id": str(process_number),
+#                                       "zone": "nova",
+#                                       "service": "compute",
+#                                       "resource_id": "34c0ce14-9ce4-4d3d-84a4-172e1ddb26c4",
+#                                       "tenant_id": "71fea2331bae4d98bb08df071169806d",
+#                                       "hostname": socket.gethostname(),
+#                                       "component": "vm",
+#                                       "control_plane": "ccp",
+#                                       "cluster": "compute",
+#                                       "cloud_name": "monasca"},
+#                        "timestamp": epoch * 1000,
+#                        "value": i})
+#
+#    # can make it an argument
+#    percentage_of_known_metrics = 10
+#    known_metric_generator = metric_simulator.generate_metrics()
+#
+#    # insert known metrics randomly into dummy metrics.
+#    # known_metric_generator can generate known_metrics indefinitely
+#    # for _ in xrange(number_of_metrics * percentage_of_known_metrics /100):
+#    #    insert_position = random.randint(0,number_of_metrics-1)
+#    #    known_metric = known_metric_generator.next()
+#    #    metrics.insert(insert_position, known_metric)
+#
+#    return metrics
 
 
 def send_metrics(agent_info, process_number):
     time.sleep(random.randint(0, 60))
+
+    node_list = [ControlPlane() for i in xrange(0, 3)]
+    node_list += [ComputeNode() for i in xrange(0, 200)]
+
     token = get_token(agent_info.keystone)
     if token is None:
         return
@@ -93,8 +175,13 @@ def send_metrics(agent_info, process_number):
         try:
             mon_client = client.Client('2_0', agent_info.monasca_url, token=token)
             start_send = time.time()
-            metrics = create_metric_list(process_number)
-            mon_client.metrics.create(jsonbody=metrics)
+
+            metrics = [node.flush() for node in node_list]
+
+            # Flush in batches of 200 to emulate the Monasca Agent
+            for i in xrange(0, len(metrics), 200):
+                mon_client.metrics.create(jsonbody=metrics[i:i + 200])
+
             end_send = time.time()
             secs = end_send - start_send
             time.sleep(wait_time-secs)
@@ -102,6 +189,8 @@ def send_metrics(agent_info, process_number):
             return
         except exc.HTTPUnauthorized:
             token = get_token(agent_info.keystone)
+        except Exception:
+            pass
 
 
 def parse_agent_config(agent_info):
