@@ -76,21 +76,8 @@ class vmSimulator(object):
     metric_names = ["cpu.time_ns",
                     "cpu.utilization_norm_perc",
                     "cpu.utilization_perc",
-                    "disk.allocation_total",
-                    "disk.capacity_total",
-                    "disk.physical_total",
                     "host_alive_status",
                     "instance",
-                    "io.errors_total",
-                    "io.errors_total_sec",
-                    "io.read_bytes_total",
-                    "io.read_bytes_total_sec",
-                    "io.read_ops_total",
-                    "io.read_ops_total_sec",
-                    "io.write_bytes_total",
-                    "io.write_bytes_total_sec",
-                    "io.write_ops_total",
-                    "io.write_ops_total_sec",
                     "mem.free_mb",
                     "mem.free_perc",
                     "memory",
@@ -102,20 +89,7 @@ class vmSimulator(object):
                     "vm.cpu.time_ns",
                     "vm.cpu.utilization_norm_perc",
                     "vm.cpu.utilization_perc",
-                    "vm.disk.allocation_total",
-                    "vm.disk.capacity_total",
-                    "vm.disk.physical_total",
                     "vm.host_alive_status",
-                    "vm.io.errors_total",
-                    "vm.io.errors_total_sec",
-                    "vm.io.read_bytes_total",
-                    "vm.io.read_bytes_total_sec",
-                    "vm.io.read_ops_total",
-                    "vm.io.read_ops_total_sec",
-                    "vm.io.write_bytes_total",
-                    "vm.io.write_bytes_total_sec",
-                    "vm.io.write_ops_total",
-                    "vm.io.write_ops_total_sec"
                     "vm.mem.free_mb",
                     "vm.mem.free_perc",
                     "vm.mem.resident_mb",
@@ -123,6 +97,32 @@ class vmSimulator(object):
                     "vm.mem.total_mb",
                     "vm.mem.used_mb",
                     "vm.ping_status"]
+    disk_agg_metric_names = ["disk.allocation_total",
+                             "disk.capacity_total",
+                             "disk.physical_total",
+                             "io.errors_total",
+                             "io.errors_total_sec",
+                             "io.read_bytes_total",
+                             "io.read_bytes_total_sec",
+                             "io.read_ops_total",
+                             "io.read_ops_total_sec",
+                             "io.write_bytes_total",
+                             "io.write_bytes_total_sec",
+                             "io.write_ops_total",
+                             "io.write_ops_total_sec",
+                             "vm.disk.allocation_total",
+                             "vm.disk.capacity_total",
+                             "vm.disk.physical_total",
+                             "vm.io.errors_total",
+                             "vm.io.errors_total_sec",
+                             "vm.io.read_bytes_total",
+                             "vm.io.read_bytes_total_sec",
+                             "vm.io.read_ops_total",
+                             "vm.io.read_ops_total_sec",
+                             "vm.io.write_bytes_total",
+                             "vm.io.write_bytes_total_sec",
+                             "vm.io.write_ops_total",
+                             "vm.io.write_ops_total_sec"]
     disk_metric_names = ["disk.allocation",
                          "disk.capacity",
                          "disk.ephemeral.size",
@@ -150,7 +150,7 @@ class vmSimulator(object):
                          "vm.io.write_bytes",
                          "vm.io.write_bytes_sec",
                          "vm.io.write_ops",
-                         "vm.io.write_ops_sec", ]
+                         "vm.io.write_ops_sec"]
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
                             # "vm.vswitch.in_bits",
@@ -214,8 +214,6 @@ class vmSimulator(object):
         self.vm_tenant_id = tenant_id or "vm_tenant_1"
         self.region = region or "region_1"
 
-        self.current_cycle = 0
-
         self.metric_ids = set()
         self.report_per_cycle = 1
 
@@ -251,6 +249,20 @@ class vmSimulator(object):
                                             tenant_id=tenant_id,
                                             region=REGION)
             self.metric_ids.add(metric_id)
+
+        for name in vmSimulator.disk_agg_metric_names:
+            dimensions = self.base_dimensions.copy()
+            tenant_id = self.vm_tenant_id
+
+            if name.startswith('vm.'):
+                dimensions['tenant_id'] = self.vm_tenant_id
+                tenant_id = self.admin_tenant_id
+
+            metric_id = add_full_definition(name=name,
+                                            dimensions=dimensions,
+                                            tenant_id=tenant_id,
+                                            region=REGION)
+            self.disk_metric_ids.add(metric_id)
 
         for name in vmSimulator.disk_metric_names:
             for disk in vmSimulator.disks:
@@ -300,17 +312,16 @@ class vmSimulator(object):
                                                 region=REGION)
                 self.vswitch_metric_ids.add(metric_id)
 
-    def get_metric_ids(self):
-        self.current_cycle += 1
+    def get_metric_ids(self, cycle):
         result = set()
 
-        if (self.current_cycle % self.report_per_cycle) == 0:
+        if (cycle % self.report_per_cycle) == 0:
             result = result.union(self.metric_ids)
 
-        if (self.current_cycle % self.disk_report_per_cycle) == 0:
+        if (cycle % self.disk_report_per_cycle) == 0:
             result = result.union(self.disk_metric_ids)
 
-        if (self.current_cycle % self.vswitch_report_per_cycle) == 0:
+        if (cycle % self.vswitch_report_per_cycle) == 0:
             result = result.union(self.vswitch_metric_ids)
 
         return result
@@ -318,11 +329,12 @@ class vmSimulator(object):
     @staticmethod
     def get_total_metric_defs():
         base_defs = len(vmSimulator.metric_names)
+        disk_agg_defs = len(vmSimulator.disk_agg_metric_names)
         disk_defs = len(vmSimulator.disk_metric_names) * len(vmSimulator.disks)
         network_defs = len(vmSimulator.network_metric_names) * len(vmSimulator.network_devices)
         vswitch_defs = len(vmSimulator.vswitch_metric_names) * len(vmSimulator.vswitches)
 
-        return base_defs + disk_defs + network_defs + vswitch_defs
+        return base_defs + disk_agg_defs + disk_defs + network_defs + vswitch_defs
 
 
 def add_measurement_batch(vm_list, base_timestamp, m_per_hour=measurements_per_hour, filename=MEASUREMENTS_FILENAME):
@@ -333,7 +345,7 @@ def add_measurement_batch(vm_list, base_timestamp, m_per_hour=measurements_per_h
             timestamp = base_timestamp + datetime.timedelta(seconds=(3600 / m_per_hour * zz))
         formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
         for vm in vm_list:
-            for metric_id in vm.get_metric_ids():
+            for metric_id in vm.get_metric_ids(zz):
                 value = str(random.randint(0, 1000000))
                 meas_list.append(','.join([metric_id, formatted_timestamp, value]) + '\n')
 
@@ -434,18 +446,9 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
     metrics_per_vm = vmSimulator.get_total_metric_defs()
-    expected_definitions = abs(start_day - end_day) * 24 * TOTAL_ACTIVE_VMS * metrics_per_vm
+    expected_definitions = abs(end_day - start_day) * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
 
     active_vms = []
-    # preload vms to running total
-    for i in xrange(TOTAL_ACTIVE_VMS):
-        global next_resource_id
-        active_vms.append(vmSimulator(resource_id=next_resource_id,
-                                      admin_tenant_id=TENANT_ID,
-                                      tenant_id=random.choice(vm_tenant_ids),
-                                      region=REGION))
-        next_resource_id += 1
-
     start_time = time.time()
     base_timestamp = datetime.datetime.utcnow()
     for x in xrange(start_day, end_day):
@@ -478,7 +481,11 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
                 print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
                 print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
+    print("Flushing Definitions")
     flush_definition_data()
+    time_delta = (time.time() - start_time)
+    print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
+    print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
     print("Waiting for pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
