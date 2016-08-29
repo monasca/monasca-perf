@@ -437,6 +437,15 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
     expected_definitions = abs(start_day - end_day) * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
 
     active_vms = []
+    # preload vms to running total
+    for i in xrange(TOTAL_ACTIVE_VMS):
+        global next_resource_id
+        active_vms.append(vmSimulator(resource_id=next_resource_id,
+                                      admin_tenant_id=TENANT_ID,
+                                      tenant_id=random.choice(vm_tenant_ids),
+                                      region=REGION))
+        next_resource_id += 1
+
     start_time = time.time()
     base_timestamp = datetime.datetime.utcnow()
     for x in xrange(start_day, end_day):
@@ -453,7 +462,6 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
                 active_vms = active_vms[new_vms_per_hour:]
 
             timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
-            print(timestamp)
 
             global measurement_process_id
             measurement_process_pool.apply_async(add_measurement_batch,
