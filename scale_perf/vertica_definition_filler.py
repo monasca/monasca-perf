@@ -1,4 +1,3 @@
-import cProfile
 import datetime
 import hashlib
 from multiprocessing import Pool
@@ -21,15 +20,16 @@ FULL_MEASUREMENTS = False
 TOTAL_ACTIVE_VMS = 800
 # Number of new metric definitions per hour
 NEW_VMS_PER_HOUR = 80
-# will fill starting from X days ago to present (when the script started)
-NUMBER_OF_DAYS = 2
+# will fill starting from START day to END day relative to the current date
+START_DAY = -45
+END_DAYS_AGO = -44
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
              }
 
 # Tenant id to report metrics under
-TENANT_ID = "bcd704b1439e4771b073b83c3a6c423b"
+TENANT_ID = "9e4b973299d04398a23cebc60c71b6ac"
 # Region in which to report metrics
 REGION = "Region 1"
 
@@ -214,7 +214,17 @@ class vmSimulator(object):
         self.vm_tenant_id = tenant_id or "vm_tenant_1"
         self.region = region or "region_1"
 
+        self.current_cycle = 0
+
         self.metric_ids = set()
+        self.report_per_cycle = 1
+
+        self.disk_metric_ids = set()
+        self.disk_report_per_cycle = 20
+
+        self.vswitch_metric_ids = set()
+        self.vswitch_report_per_cycle = 10
+
         self.base_dimensions = {
             "cloud_name": "test_cloud",
             "cluster": "test_cluster",
@@ -236,10 +246,11 @@ class vmSimulator(object):
                 dimensions['tenant_id'] = self.vm_tenant_id
                 tenant_id = self.admin_tenant_id
 
-            self.metric_ids.add(add_full_definition(name=name,
-                                                    dimensions=dimensions,
-                                                    tenant_id=tenant_id,
-                                                    region=REGION))
+            metric_id = add_full_definition(name=name,
+                                            dimensions=dimensions,
+                                            tenant_id=tenant_id,
+                                            region=REGION)
+            self.metric_ids.add(metric_id)
 
         for name in vmSimulator.disk_metric_names:
             for disk in vmSimulator.disks:
@@ -251,10 +262,11 @@ class vmSimulator(object):
                     tenant_id = self.admin_tenant_id
 
                 dimensions['device'] = disk
-                self.metric_ids.add(add_full_definition(name=name,
-                                                        dimensions=dimensions,
-                                                        tenant_id=tenant_id,
-                                                        region=REGION))
+                metric_id = add_full_definition(name=name,
+                                                dimensions=dimensions,
+                                                tenant_id=tenant_id,
+                                                region=REGION)
+                self.disk_metric_ids.add(metric_id)
 
         for name in vmSimulator.network_metric_names:
             for device in vmSimulator.network_devices:
@@ -266,10 +278,11 @@ class vmSimulator(object):
                     tenant_id = self.admin_tenant_id
 
                 dimensions['device'] = device
-                self.metric_ids.add(add_full_definition(name=name,
-                                                        dimensions=dimensions,
-                                                        tenant_id=tenant_id,
-                                                        region=REGION))
+                metric_id = add_full_definition(name=name,
+                                                dimensions=dimensions,
+                                                tenant_id=tenant_id,
+                                                region=REGION)
+                self.metric_ids.add(metric_id)
 
         for name in vmSimulator.vswitch_metric_names:
             for switch in vmSimulator.vswitches:
@@ -281,13 +294,26 @@ class vmSimulator(object):
                     tenant_id = self.admin_tenant_id
 
                 dimensions['device'] = switch
-                self.metric_ids.add(add_full_definition(name=name,
-                                                        dimensions=dimensions,
-                                                        tenant_id=tenant_id,
-                                                        region=REGION))
+                metric_id = add_full_definition(name=name,
+                                                dimensions=dimensions,
+                                                tenant_id=tenant_id,
+                                                region=REGION)
+                self.vswitch_metric_ids.add(metric_id)
 
     def get_metric_ids(self):
-        return self.metric_ids
+        self.current_cycle += 1
+        result = set()
+
+        if (self.current_cycle % self.report_per_cycle) == 0:
+            result = result.union(self.metric_ids)
+
+        if (self.current_cycle % self.disk_report_per_cycle) == 0:
+            result = result.union(self.disk_metric_ids)
+
+        if (self.current_cycle % self.vswitch_report_per_cycle) == 0:
+            result = result.union(self.vswitch_metric_ids)
+
+        return result
 
     @staticmethod
     def get_total_metric_defs():
@@ -299,11 +325,17 @@ class vmSimulator(object):
         return base_defs + disk_defs + network_defs + vswitch_defs
 
 
-def add_measurement_batch(id_list, timestamp, filename):
+def add_measurement_batch(vm_list, base_timestamp, m_per_hour=measurements_per_hour, filename=MEASUREMENTS_FILENAME):
     meas_list = []
-    for metric_id in id_list:
-        value = str(random.randint(0, 1000000))
-        meas_list.append(','.join([metric_id, timestamp, value]) + '\n')
+    timestamp = base_timestamp
+    for zz in xrange(m_per_hour):
+        if m_per_hour is not 0:
+            timestamp = base_timestamp + datetime.timedelta(seconds=(3600 / m_per_hour * zz))
+        formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        for vm in vm_list:
+            for metric_id in vm.get_metric_ids():
+                value = str(random.randint(0, 1000000))
+                meas_list.append(','.join([metric_id, formatted_timestamp, value]) + '\n')
 
     flush_measurement_data(meas_list, filename)
 
@@ -387,26 +419,27 @@ def flush_measurement_data(meas_list, filename):
 
     query = MEASUREMENT_COPY_QUERY.format(filename)
 
-    run_query(query)
+    meas_temp.write(run_query(query))
 
-    os.remove(filename)
+    # os.remove(filename)
 
 
 def id_generator(size=32, chars=string.hexdigits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-def fill_metrics(number_of_days, new_vms_per_hour):
+def fill_metrics(start_day, end_day, new_vms_per_hour):
+    load_start_time = time.time()
     measurement_process_pool = Pool(total_measurement_processes)
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
     metrics_per_vm = vmSimulator.get_total_metric_defs()
-    expected_definitions = NUMBER_OF_DAYS * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
+    expected_definitions = abs(start_day - end_day) * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
 
     active_vms = []
     start_time = time.time()
-    base_timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=NUMBER_OF_DAYS)
-    for x in xrange(number_of_days):
+    base_timestamp = datetime.datetime.utcnow()
+    for x in xrange(start_day, end_day):
         for y in xrange(24):
             for z in xrange(new_vms_per_hour):
                 global next_resource_id
@@ -419,19 +452,16 @@ def fill_metrics(number_of_days, new_vms_per_hour):
             if len(active_vms) > TOTAL_ACTIVE_VMS:
                 active_vms = active_vms[new_vms_per_hour:]
 
-            for zz in xrange(measurements_per_hour):
-                timestamp = base_timestamp + datetime.timedelta(days=x, hours=y, seconds=(30 * zz))
-                formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                metric_ids = []
-                for vm in active_vms:
-                    metric_ids.extend(vm.get_metric_ids())
+            timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
+            print(timestamp)
 
-                global measurement_process_id
-                measurement_process_pool.apply_async(add_measurement_batch,
-                                                     args=(metric_ids,
-                                                           formatted_timestamp,
-                                                           MEASUREMENTS_FILENAME + str(measurement_process_id,)))
-                measurement_process_id += 1
+            global measurement_process_id
+            measurement_process_pool.apply_async(add_measurement_batch,
+                                                 args=(active_vms,
+                                                       timestamp,
+                                                       measurements_per_hour,
+                                                       MEASUREMENTS_FILENAME + str(measurement_process_id,)))
+            measurement_process_id += 1
 
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
                 print("Flushing Definitions")
@@ -441,8 +471,10 @@ def fill_metrics(number_of_days, new_vms_per_hour):
                 print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
     flush_definition_data()
+    print("Waiting for pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
+    print("Loaded in: " + str(time.time() - load_start_time) + " secs")
 
 
 def run_query(query):
@@ -465,8 +497,8 @@ def vertica_db_filler():
         run_query(query)
 
     # print("New definitions per day: {}".format(definitions_per_day))
-    print("Creating metric history for the past {} days".format(NUMBER_OF_DAYS))
-    fill_metrics(NUMBER_OF_DAYS, NEW_VMS_PER_HOUR)
+    print("Creating metric history for {} days".format(abs(START_DAY - END_DAYS_AGO)))
+    fill_metrics(START_DAY, END_DAYS_AGO, NEW_VMS_PER_HOUR)
     print("  Created {} definitions total".format(len(def_dim_id_set)))
 
     print("Checking if data arrived...")
