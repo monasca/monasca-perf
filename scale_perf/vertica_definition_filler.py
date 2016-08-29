@@ -434,7 +434,7 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
     metrics_per_vm = vmSimulator.get_total_metric_defs()
-    expected_definitions = abs(start_day - end_day) * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
+    expected_definitions = abs(start_day - end_day) * 24 * TOTAL_ACTIVE_VMS * metrics_per_vm
 
     active_vms = []
     # preload vms to running total
