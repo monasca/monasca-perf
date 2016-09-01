@@ -1,7 +1,6 @@
 import datetime
 import hashlib
 from multiprocessing import Pool
-import os
 import random
 import string
 import subprocess
@@ -14,13 +13,17 @@ import time
 
 # Clear the current metrics from the DB for testing
 CLEAR_METRICS = True
-# Add metrics every 30 seconds for the full measurement load (false, send only one per hour)
+
+# Add metrics every 30 seconds for the full measurement load (false, send only one metric per hour)
 FULL_MEASUREMENTS = False
-# Total definitions active at one time
+
+# Total vms active at one time
 TOTAL_ACTIVE_VMS = 800
-# Number of new metric definitions per hour
+
+# Number of new vms per hour. New vms will push out old vms.
 NEW_VMS_PER_HOUR = 80
-# will fill starting from START day to END day relative to the current date
+
+# fill starting from START days to END days relative to the current date
 START_DAY = -45
 END_DAYS_AGO = -44
 
@@ -32,6 +35,14 @@ CONN_INFO = {'user': 'dbadmin',
 TENANT_ID = "9e4b973299d04398a23cebc60c71b6ac"
 # Region in which to report metrics
 REGION = "Region 1"
+
+
+# Number of different tenants to create vms under
+TOTAL_VM_TENANTS = 256
+
+# number of definitions to store in memory before writing to vertica
+LOCAL_STORAGE_MAX = 100000
+
 
 DEF_DIMS_FILENAME = '/tmp/defdims.dat'
 
@@ -64,10 +75,6 @@ next_resource_id = 1
 measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
 
 ID_SIZE = 20
-TOTAL_VM_TENANTS = 256
-
-LOCAL_STORAGE_MAX = 100000
-
 
 class vmSimulator(object):
     disks = ['sda', 'sdb', 'sdc']
@@ -474,6 +481,8 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
                                                        MEASUREMENTS_FILENAME + str(measurement_process_id,)))
             measurement_process_id += 1
 
+            # submit definitions in batches to avoid
+            # using lots of memory and making long queries
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
                 print("Flushing Definitions")
                 flush_definition_data()
@@ -481,14 +490,18 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
                 print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
                 print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
-    print("Flushing Definitions")
-    flush_definition_data()
-    time_delta = (time.time() - start_time)
-    print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
-    print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
+    # insert any remaining definitions
+    if len(def_dims_list) > 0:
+        print("Flushing Definitions")
+        flush_definition_data()
+        time_delta = (time.time() - start_time)
+        print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
+        print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
+
     print("Waiting for pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
+
     print("Loaded in: " + str(time.time() - load_start_time) + " secs")
 
 
