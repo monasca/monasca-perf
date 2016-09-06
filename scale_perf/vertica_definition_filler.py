@@ -6,6 +6,7 @@ import string
 import subprocess
 import sys
 import time
+import uuid
 
 """ vertica_definition_filler
     This will simulate a number of days worth of metric definition history.
@@ -20,19 +21,23 @@ FULL_MEASUREMENTS = False
 # Total vms active at one time
 TOTAL_ACTIVE_VMS = 800
 
-# Number of new vms per hour. New vms will push out old vms.
+# Number of new vms per hour.
 NEW_VMS_PER_HOUR = 80
 
-# fill starting from START days to END days relative to the current date
+# Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
+VMS_BELOW_PROBATION = 8
+
+# start day, relative to the current date
 START_DAY = -45
-END_DAYS_AGO = -44
+# number of days to fill
+DAYS_TO_FILL = 4
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
              }
 
 # Tenant id to report metrics under
-TENANT_ID = "9e4b973299d04398a23cebc60c71b6ac"
+TENANT_ID = "98737d81752f4ebcba8e576a05dc487b"
 # Region in which to report metrics
 REGION = "Region 1"
 
@@ -71,10 +76,11 @@ def_dims_list = []
 measurement_process_id = 0
 total_measurement_processes = 5
 
-next_resource_id = 1
+next_hostname_id = 1
 measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
 
 ID_SIZE = 20
+
 
 class vmSimulator(object):
     disks = ['sda', 'sdb', 'sdc']
@@ -215,20 +221,32 @@ class vmSimulator(object):
                             "vm.net.out_packets",
                             "vm.net.out_packets_sec"]
 
-    def __init__(self, resource_id, admin_tenant_id, tenant_id, region):
+    def __init__(self, resource_id,
+                 hostname='test_vm_host_1',
+                 admin_tenant_id='tenant_1',
+                 tenant_id='vm_tenant_1',
+                 region='region_1',
+                 created_timestamp=datetime.datetime.utcnow(),
+                 lifespan_cycles=20,
+                 seconds_per_cycle=30):
         self.resource_id = resource_id
-        self.admin_tenant_id = admin_tenant_id or "tenant_1"
-        self.vm_tenant_id = tenant_id or "vm_tenant_1"
-        self.region = region or "region_1"
+        self.admin_tenant_id = admin_tenant_id
+        self.vm_tenant_id = tenant_id
+        self.region = region
+        self.created_timestamp = created_timestamp
+
+        self.seconds_per_cycle = seconds_per_cycle
+        self.current_cycle = 0
+        self.lifespan_cycles = lifespan_cycles
 
         self.metric_ids = set()
         self.report_per_cycle = 1
 
         self.disk_metric_ids = set()
-        self.disk_report_per_cycle = 20
+        self.disk_report_per_cycle = 1
 
         self.vswitch_metric_ids = set()
-        self.vswitch_report_per_cycle = 10
+        self.vswitch_report_per_cycle = 1
 
         self.base_dimensions = {
             "cloud_name": "test_cloud",
@@ -237,7 +255,8 @@ class vmSimulator(object):
             "resource_id": str(resource_id),
             "zone": "nova",
             "component": "vm",
-            "hostname": "test_vm_host_" + str(resource_id)
+            "hostname": str(hostname),
+            "lifespan": str(lifespan_cycles)
         }
 
         self.preload_metrics()
@@ -319,8 +338,14 @@ class vmSimulator(object):
                                                 region=REGION)
                 self.vswitch_metric_ids.add(metric_id)
 
-    def get_metric_ids(self, cycle):
+    def get_metric_ids(self, cycle=None):
         result = set()
+
+        if not cycle:
+            result = result.union(self.metric_ids)
+            result = result.union(self.disk_metric_ids)
+            result = result.union(self.vswitch_metric_ids)
+            return result
 
         if (cycle % self.report_per_cycle) == 0:
             result = result.union(self.metric_ids)
@@ -333,6 +358,23 @@ class vmSimulator(object):
 
         return result
 
+    def create_measurements(self, timestamp=None):
+        if self.current_cycle >= self.lifespan_cycles:
+            return []
+
+        if timestamp is None:
+            second_delta = self.seconds_per_cycle * self.current_cycle
+            timestamp = self.created_timestamp + datetime.timedelta(seconds=second_delta)
+            timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+
+        meas_list = []
+        for metric_id in self.get_metric_ids(self.current_cycle):
+            value = str(random.randint(0, 1000000))
+            meas_list.append(','.join([metric_id, timestamp, value]) + '\n')
+        self.current_cycle += 1
+        return meas_list
+
+
     @staticmethod
     def get_total_metric_defs():
         base_defs = len(vmSimulator.metric_names)
@@ -344,17 +386,16 @@ class vmSimulator(object):
         return base_defs + disk_agg_defs + disk_defs + network_defs + vswitch_defs
 
 
-def add_measurement_batch(vm_list, base_timestamp, m_per_hour=measurements_per_hour, filename=MEASUREMENTS_FILENAME):
+def add_measurement_batch(vm_list, filename=MEASUREMENTS_FILENAME):
     meas_list = []
-    timestamp = base_timestamp
-    for zz in xrange(m_per_hour):
-        if m_per_hour is not 0:
-            timestamp = base_timestamp + datetime.timedelta(seconds=(3600 / m_per_hour * zz))
-        formatted_timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    while True:
+        new_measurements = []
         for vm in vm_list:
-            for metric_id in vm.get_metric_ids(zz):
-                value = str(random.randint(0, 1000000))
-                meas_list.append(','.join([metric_id, formatted_timestamp, value]) + '\n')
+            new_measurements.extend(vm.create_measurements())
+
+        if len(new_measurements) == 0:
+            break
+        meas_list.extend(new_measurements)
 
     flush_measurement_data(meas_list, filename)
 
@@ -447,37 +488,53 @@ def id_generator(size=32, chars=string.hexdigits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-def fill_metrics(start_day, end_day, new_vms_per_hour):
-    load_start_time = time.time()
+def fill_metrics(start_day, days_to_fill, new_vms_per_hour, vms_below_probation):
     measurement_process_pool = Pool(total_measurement_processes)
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
-    metrics_per_vm = vmSimulator.get_total_metric_defs()
-    expected_definitions = abs(end_day - start_day) * 24 * NEW_VMS_PER_HOUR * metrics_per_vm
 
-    active_vms = []
+    metrics_per_vm = vmSimulator.get_total_metric_defs()
+    expected_definitions = (days_to_fill * 24 *
+                            (NEW_VMS_PER_HOUR + VMS_BELOW_PROBATION) * metrics_per_vm)
+
+    seconds_per_cycle = 30 if FULL_MEASUREMENTS else 3600  # 30 sec or 1 hour
+    cycles_per_hour = 3600 / seconds_per_cycle
+    churn_lifespan = (TOTAL_ACTIVE_VMS / NEW_VMS_PER_HOUR) * cycles_per_hour
+    available_lifespan = days_to_fill * 24 * cycles_per_hour
+
+    standard_lifespan = min(churn_lifespan, available_lifespan)
+
     start_time = time.time()
     base_timestamp = datetime.datetime.utcnow()
-    for x in xrange(start_day, end_day):
+    for x in xrange(start_day, start_day + days_to_fill):
         for y in xrange(24):
-            for z in xrange(new_vms_per_hour):
-                global next_resource_id
-                active_vms.append(vmSimulator(resource_id=next_resource_id,
+            timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
+            active_vms = []
+            for z in xrange(new_vms_per_hour + vms_below_probation):
+                global next_hostname_id
+                resource_id = uuid.uuid4()
+
+                if z < vms_below_probation:
+                    lifespan_cycles = 1
+                else:
+                    lifespan_cycles = standard_lifespan
+
+                active_vms.append(vmSimulator(resource_id=resource_id,
+                                              hostname='test_' + str(next_hostname_id),
                                               admin_tenant_id=TENANT_ID,
                                               tenant_id=random.choice(vm_tenant_ids),
-                                              region=REGION))
-                next_resource_id += 1
+                                              region=REGION,
+                                              created_timestamp=timestamp,
+                                              lifespan_cycles=lifespan_cycles,
+                                              seconds_per_cycle=seconds_per_cycle))
+                next_hostname_id += 1
 
-            if len(active_vms) > TOTAL_ACTIVE_VMS:
-                active_vms = active_vms[new_vms_per_hour:]
-
-            timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
+            # if len(active_vms) > TOTAL_ACTIVE_VMS:
+            #     active_vms = active_vms[new_vms_per_hour:]
 
             global measurement_process_id
             measurement_process_pool.apply_async(add_measurement_batch,
                                                  args=(active_vms,
-                                                       timestamp,
-                                                       measurements_per_hour,
                                                        MEASUREMENTS_FILENAME + str(measurement_process_id,)))
             measurement_process_id += 1
 
@@ -486,23 +543,21 @@ def fill_metrics(start_day, end_day, new_vms_per_hour):
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
                 print("Flushing Definitions")
                 flush_definition_data()
-                time_delta = (time.time() - start_time)
-                print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
                 print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
     # insert any remaining definitions
     if len(def_dims_list) > 0:
         print("Flushing Definitions")
         flush_definition_data()
-        time_delta = (time.time() - start_time)
-        print("{0:.0f} def / sec".format(len(def_dim_id_set) / time_delta))
         print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
 
-    print("Waiting for pool to close")
+    print("Waiting for measurement process pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
 
-    print("Loaded in: " + str(time.time() - load_start_time) + " secs")
+    total_time_delta = time.time() - start_time
+    print("Loaded {} definitions in {} secs".format(len(def_dim_id_set), total_time_delta))
+    print("{0:.0f} def/sec\n".format(len(def_dim_id_set) / total_time_delta))
 
 
 def run_query(query):
@@ -524,18 +579,12 @@ def vertica_db_filler():
                 "TRUNCATE TABLE MonMetrics.Measurements;"
         run_query(query)
 
-    # print("New definitions per day: {}".format(definitions_per_day))
-    print("Creating metric history for {} days".format(abs(START_DAY - END_DAYS_AGO)))
-    fill_metrics(START_DAY, END_DAYS_AGO, NEW_VMS_PER_HOUR)
-    print("  Created {} definitions total".format(len(def_dim_id_set)))
+    print("Creating metric history for {} days".format(DAYS_TO_FILL))
+    fill_metrics(START_DAY, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
 
     print("Checking if data arrived...")
     print(" DefinitionDimensions")
     print(run_query("SELECT count(*) FROM MonMetrics.DefinitionDimensions;"))
-    print(" Definitions")
-    print(run_query("SELECT count(*) FROM MonMetrics.Definitions;"))
-    print(" Dimensions")
-    print(run_query("SELECT count(*) FROM MonMetrics.Dimensions;"))
     print(" Measurements")
     print(run_query("SELECT count(*) FROM MonMetrics.Measurements;"))
 
