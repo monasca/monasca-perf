@@ -16,7 +16,11 @@ monitoring = ['monasca-api',
               'vertica']
 
 transform = ['monasca-transform',
-             'transform/lib/driver']
+             'pyspark',
+             'transform/lib/driver',
+             'org.apache.spark.executor.CoarseGrainedExecutorBackend',
+             'org.apache.spark.deploy.master.Master',
+             'org.apache.spark.deploy.master.Worker']
 
 logging = ['monasca-log-api',
            'kibana',
@@ -26,9 +30,7 @@ logging = ['monasca-log-api',
 
 ceilometer = ['ceilometer-api',
               'ceilometer-polling',
-              'ceilometer-agent-notification',
-              'org.apache.spark.deploy.master.Master',
-              'org.apache.spark.deploy.master.Worker']
+              'ceilometer-agent-notification']
 
 openstack = ['rabbitmq',
              'mysqld']
