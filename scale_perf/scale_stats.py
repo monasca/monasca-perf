@@ -15,14 +15,20 @@ monitoring = ['monasca-api',
               'org.apache.zookeeper.server',
               'vertica']
 
-transform = []
+transform = ['monasca-transform',
+             'transform/lib/driver']
 
 logging = ['monasca-log-api',
+           'kibana',
            'elasticsearch',
            'logstash',
            'beaver']
 
-ceilometer = []
+ceilometer = ['ceilometer-api',
+              'ceilometer-polling',
+              'ceilometer-agent-notification',
+              'org.apache.spark.deploy.master.Master',
+              'org.apache.spark.deploy.master.Worker']
 
 openstack = ['rabbitmq',
              'mysqld']
