@@ -15,10 +15,14 @@ monitoring = ['monasca-api',
               'org.apache.zookeeper.server',
               'vertica']
 
+transform = []
+
 logging = ['monasca-log-api',
            'elasticsearch',
            'logstash',
            'beaver']
+
+ceilometer = []
 
 openstack = ['rabbitmq',
              'mysqld']
@@ -111,19 +115,19 @@ def host_average(mml_nodes):
 def host_report(nodes):
     host_data = host_average(nodes)
 
-    print("{:<10}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
-    print("------------------------------------------")
-    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
+    print("{:<21}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
+    print("-----------------------------------------------------")
+    print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
           host_data[0][0],
           host_data[1][0],
           host_data[2][0]))
 
-    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
+    print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
           host_data[0][1]/1024,
           host_data[1][1]/1024,
           host_data[2][1]/1024))
 
-    print("{:<10}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
+    print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
           host_data[0][2]/1024,
           host_data[1][2]/1024,
           host_data[2][2]/1024))
@@ -139,7 +143,7 @@ def process_data(process, nodes, data):
 def process_group_report(processes, nodes, cpu, mem):
     total_cpu = {'node1': [], 'node2': [], 'node3': []}
 
-    print("{:<21}| {:^8} | {:^8} | {:^8}".format("CPU", "node 1", "node 2", "node 3"))
+    print("{:<21}| {:^8} | {:^8} | {:^8}".format("CPU", "Node 1", "Node 2", "Node 3"))
     print("-----------------------------------------------------")
     for process in processes:
         try:
@@ -153,7 +157,7 @@ def process_group_report(processes, nodes, cpu, mem):
             if process == 'org.apache.zookeeper.server':
                 process = 'zookeeper'
 
-            if process == 'kafka.kafka':
+            if process == 'kafka.Kafka':
                 process = 'kafka'
 
             print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(process, n1, n2, n3))
@@ -169,7 +173,7 @@ def process_group_report(processes, nodes, cpu, mem):
 
     total_mem = {'node1': [], 'node2': [], 'node3': []}
     print("\n")
-    print("{:<21}| {:^8} | {:^8} | {:^8}".format("MEM", "node 1", "node 2", "node 3"))
+    print("{:<21}| {:^8} | {:^8} | {:^8}".format("MEM", "Node 1", "Node 2", "Node 3"))
     print("-----------------------------------------------------")
     for process in processes:
         try:
@@ -183,7 +187,7 @@ def process_group_report(processes, nodes, cpu, mem):
             if process == 'org.apache.zookeeper.server':
                 process = 'zookeeper'
 
-            if process == 'kafka.kafka':
+            if process == 'kafka.Kafka':
                 process = 'kafka'
 
             print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(process, n1, n2, n3))
@@ -214,7 +218,9 @@ def generate_report():
         mem = []
 
     for name, group in [('Monitoring', monitoring),
+                        ('Transform', transform),
                         ('Logging', logging),
+                        ('Ceilometer', ceilometer),
                         ('Openstack', openstack),
                         ('HOS', hos)]:
         print("\n")
