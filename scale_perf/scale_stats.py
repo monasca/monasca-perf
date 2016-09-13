@@ -20,7 +20,7 @@ transform = ['monasca-transform',
              'transform/lib/driver',
              'org.apache.spark.executor.CoarseGrainedExecutorBackend',
              'org.apache.spark.deploy.master.Master',
-             'org.apache.spark.deploy.master.Worker']
+             'org.apache.spark.deploy.worker.Worker']
 
 logging = ['monasca-log-api',
            'kibana',
@@ -53,6 +53,8 @@ keystone = {
     'domain_name': utils.env('OS_DOMAIN_NAME'),
     'region_name': utils.env('OS_REGION_NAME')
 }
+
+errors = []
 
 
 class StatsResult(object):
@@ -112,10 +114,14 @@ def host_average(mml_nodes):
 
     result = []
     for node in mml_nodes:
-        result.append(
-            [cpu.select('hostname', node).values,
-             min_mem.select('hostname', node).values,
-             max_used.select('hostname', node).values])
+        try:
+            result.append(
+                [cpu.select('hostname', node).values,
+                 min_mem.select('hostname', node).values,
+                 max_used.select('hostname', node).values])
+        except Exception:
+            errors.append("Bad host data for node: {}".format(node))
+            result.append([0, 0, 0])
 
     return result
 
@@ -123,39 +129,43 @@ def host_average(mml_nodes):
 def host_report(nodes):
     host_data = host_average(nodes)
 
-    print("{:<21}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
-    print("-----------------------------------------------------")
-    print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
+    print("{:<30}| {:^8} | {:^8} | {:^8}".format("SYSTEM", "Node 1", "Node 2", "Node 3"))
+    print("--------------------------------------------------------------")
+    print("{:<30}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("idle %",
           host_data[0][0],
           host_data[1][0],
           host_data[2][0]))
 
-    print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
+    print("{:<30}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("min free",
           host_data[0][1]/1024,
           host_data[1][1]/1024,
           host_data[2][1]/1024))
 
-    print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
+    print("{:<30}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format("max used",
           host_data[0][2]/1024,
           host_data[1][2]/1024,
           host_data[2][2]/1024))
 
 
-def process_data(process, nodes, data):
+def process_data(process, nodes, data, _type):
     result = []
     for node in nodes:
-        result.append(data.select('hostname', node).select('process_name', process).values)
+        try:
+            result.append(data.select('hostname', node).select('process_name', process).values)
+        except Exception:
+            errors.append("Bad {} data for {} on node {}".format(_type, process, node))
+            result.append(-1)
     return result
 
 
 def process_group_report(processes, nodes, cpu, mem):
     total_cpu = {'node1': [], 'node2': [], 'node3': []}
 
-    print("{:<21}| {:^8} | {:^8} | {:^8}".format("CPU", "Node 1", "Node 2", "Node 3"))
-    print("-----------------------------------------------------")
+    print("{:<30}| {:^8} | {:^8} | {:^8}".format("CPU", "Node 1", "Node 2", "Node 3"))
+    print("--------------------------------------------------------------")
     for process in processes:
         try:
-            n1, n2, n3 = process_data(process, nodes, cpu)
+            n1, n2, n3 = process_data(process, nodes, cpu, "CPU")
 
             total_cpu['node1'].append(n1)
             total_cpu['node2'].append(n2)
@@ -168,12 +178,12 @@ def process_group_report(processes, nodes, cpu, mem):
             if process == 'kafka.Kafka':
                 process = 'kafka'
 
-            print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(process, n1, n2, n3))
+            print("{:<30}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(process[:30], n1, n2, n3))
         except Exception:
-            print("Bad data for {}".format(process))
+            errors.append("Bad data for {}".format(process))
 
-    print("-----------------------------------------------------")
-    print("{:<21}| {:>8.2f} | {:>8.2f} | {:8.2f}"
+    print("--------------------------------------------------------------")
+    print("{:<30}| {:>8.2f} | {:>8.2f} | {:8.2f}"
           .format('total',
                   sum(total_cpu['node1']),
                   sum(total_cpu['node2']),
@@ -181,11 +191,11 @@ def process_group_report(processes, nodes, cpu, mem):
 
     total_mem = {'node1': [], 'node2': [], 'node3': []}
     print("\n")
-    print("{:<21}| {:^8} | {:^8} | {:^8}".format("MEM", "Node 1", "Node 2", "Node 3"))
-    print("-----------------------------------------------------")
+    print("{:<30}| {:^8} | {:^8} | {:^8}".format("MEM", "Node 1", "Node 2", "Node 3"))
+    print("--------------------------------------------------------------")
     for process in processes:
         try:
-            n1, n2, n3 = process_data(process, nodes, mem)
+            n1, n2, n3 = process_data(process, nodes, mem, "MEM")
 
             total_mem['node1'].append(n1)
             total_mem['node2'].append(n2)
@@ -198,12 +208,12 @@ def process_group_report(processes, nodes, cpu, mem):
             if process == 'kafka.Kafka':
                 process = 'kafka'
 
-            print("{:<21}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(process, n1, n2, n3))
+            print("{:<30}| {:>8.2f} | {:>8.2f} | {:>8.2f}".format(process[:30], n1, n2, n3))
         except Exception:
-            print("Bad data for {}".format(process))
+            errors.append("Bad data for {}".format(process))
 
-    print("-----------------------------------------------------")
-    print("{:<21}| {:>8.2f} | {:>8.2f} | {:8.2f}"
+    print("--------------------------------------------------------------")
+    print("{:<30}| {:>8.2f} | {:>8.2f} | {:8.2f}"
           .format('total',
                   sum(total_mem['node1']),
                   sum(total_mem['node2']),
@@ -234,6 +244,12 @@ def generate_report():
         print("\n")
         print("-- {} ------------------".format(name))
         process_group_report(group, mml_nodes, cpu, mem)
+
+    print("\n")
+    print("Errors:")
+    for e in errors:
+        print(e)
+
 
 if __name__ == "__main__":
     args = parse_args()

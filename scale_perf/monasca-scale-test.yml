@@ -35,6 +35,9 @@
       pause: minutes=1
       run_once: true
       when: number_agents is defined
+    - name: Save start time
+      shell: date -Iseconds
+      register: start_time
     - name: Start collection
       shell: >
         : && . /home/stack/service.osrc &&
@@ -58,6 +61,9 @@
     - name: pause for run_tests to complete
       pause: minutes={{ run_time }}
       run_once: true
+    - name: Save end time
+      shell: date -Iseconds
+      register: end_time
 
 - name: Copy results back
   hosts: MON-API[0]
@@ -87,7 +93,7 @@
         - metrics_per_second
         - system_info
 
-- name: Copy results back and run parser
+- name: Copy results back
   hosts: MON-API[2]
   sudo: yes
   tags: collect_data
@@ -100,7 +106,20 @@
         - kafka_info
         - metrics_per_second
         - system_info
-    - name: Run top parser
-      shell: python /home/stack/scale_perf/top_parser.py /home/stack/monasca_test/{{ output_directory }}/ '' > /home/stack/monasca_test/{{ output_directory }}/cpu_info
+
+- name: Query performance stats
+  hosts: MON-API[0]
+  sudo: yes
+  tags: run_collection
+  vars_files:
+    - roles/monasca-variables/defaults/main.yml
+    - roles/vertica/defaults/main.yml
+    - roles/vertica/vars/main.yml
+  tasks:
+    - name: Query stats
+      shell: >
+        : && . /home/stack/service.osrc &&
+        . {{ monasca_agent_virtualenv_dir }}/bin/activate &&
+        python /home/stack/scale_perf/scale_stats.py {{ start_time.stdout }} {{ end_time.stdout }} > /home/stack/monasca_test/{{ output_directory }}/cpu_info
       delegate_to: 127.0.0.1
 
