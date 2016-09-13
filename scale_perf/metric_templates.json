@@ -103,6 +103,117 @@
     },
     "timestamp": "get_timestamp()",
     "value": 2.998175744E11
+  },
+  "vm.mem.total_mb": {
+    "name": "vm.mem.total_mb",
+    "dimensions": {
+      "resource_id": "a",
+      "service": "random.choice(service_list)",
+      "hostname": "random.choice(host_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "cluster": "random.choice(cluster_list)",
+      "cloud_name": "random.choice(cloud_name_list)",
+      "tenant_id": "2"
+    },
+    "timestamp": "get_timestamp()",
+    "value": 64164.0
+  },
+  "vm.mem.used_mb": {
+    "name": "vm.mem.used_mb",
+    "dimensions": {
+      "service": "random.choice(service_list)",
+      "hostname": "random.choice(host_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "cluster": "random.choice(cluster_list)",
+      "cloud_name": "random.choice(cloud_name_list)",
+      "resource_id": "a",
+      "tenant_id": "2"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "round(random.randrange(40000,55000),1)"
+  },
+  "nova.vm.mem.total_allocated_mb": {
+    "name": "nova.vm.mem.total_allocated_mb",
+    "dimensions": {
+      "service": "random.choice(service_list)",
+      "hostname": "random.choice(host_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "cluster": "random.choice(cluster_list)",
+      "cloud_name": "random.choice(cloud_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "round(random.randrange(40000,55000),1)"
+  },
+  "disk.total_space_mb": {
+    "name": "disk.total_space_mb",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.randrange(2500,2800)"
+  },
+  "vm.disk.allocation": {
+    "name": "vm.disk.allocation",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)",
+      "tenant_id": "1",
+      "resource_id": "a"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.randrange(2500,2800)"
+  },
+  "vcpus": {
+    "name": "vcpus",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)",
+      "resource_id":"b1a7f31d-3f85-4475-a50b-77094b62b078",
+      "source":"openstack",
+      "project_id":"8647fd5030b04a799b0411cc38c4102d",
+      "user_id":"a69aabac824c4e1688702b8eb7e22af2",
+      "type":"gauge"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.randrange(2500,2800)"
+  },
+  "nova.vm.cpu.total_allocated": {
+    "name": "nova.vm.cpu.total_allocated",
+    "dimensions": {
+      "cloud_name": "random.choice(cloud_name_list)",
+      "component": "random.choice(component_list)",
+      "control_plane": "random.choice(control_plane_list)",
+      "service": "random.choice(service_list)",
+      "cluster": "random.choice(cluster_list)",
+      "hostname": "random.choice(host_name_list)"
+    },
+    "timestamp": "get_timestamp()",
+    "value": "random.choice([51.0,101.0, 142.0,152.0, 182.0, 252.0])"
+  },
+  "swiftlm.diskusage.host.val.avail": {
+    "name": "swiftlm.diskusage.host.val.avail",
+    "dimensions": {
+      "cloud_name": "random.choice(component_list)",
+      "mount": "/srv/node/disk0",
+      "control_plane": "random.choice(control_plane_list)",
+      "device": "/dev/sdb1",
+      "service": "object-storage",
+      "hostname": "ceil-cp1-swobj0003-mgmt",
+      "cluster": "swobj",
+      "label": "---NA---"
+    },
+    "timestamp": "get_timestamp()",
+    "value": 2.998175744E11
   }
 }
 
