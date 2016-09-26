@@ -2,6 +2,7 @@ import datetime
 import hashlib
 from multiprocessing import Pool
 import random
+import os
 import string
 import subprocess
 import sys
@@ -28,7 +29,7 @@ NEW_VMS_PER_HOUR = 80
 VMS_BELOW_PROBATION = 8
 
 # start day, relative to the current date
-START_DAY = -45
+START_DAY = -41
 # number of days to fill
 DAYS_TO_FILL = 4
 
@@ -479,9 +480,9 @@ def flush_measurement_data(meas_list, filename):
 
     query = MEASUREMENT_COPY_QUERY.format(filename)
 
-    meas_temp.write(run_query(query))
+    run_query(query)
 
-    # os.remove(filename)
+    os.remove(filename)
 
 
 def id_generator(size=32, chars=string.hexdigits):
@@ -504,6 +505,7 @@ def fill_metrics(start_day, days_to_fill, new_vms_per_hour, vms_below_probation)
 
     standard_lifespan = min(churn_lifespan, available_lifespan)
 
+    initial_id_set_size = len(def_dim_id_set)
     start_time = time.time()
     base_timestamp = datetime.datetime.utcnow()
     for x in xrange(start_day, start_day + days_to_fill):
@@ -543,20 +545,22 @@ def fill_metrics(start_day, days_to_fill, new_vms_per_hour, vms_below_probation)
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
                 print("Flushing Definitions")
                 flush_definition_data()
-                print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
+                delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
+                print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
 
     # insert any remaining definitions
     if len(def_dims_list) > 0:
         print("Flushing Definitions")
         flush_definition_data()
-        print("{0:.2f} %".format(len(def_dim_id_set) / float(expected_definitions) * 100))
+        delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
+        print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
 
     print("Waiting for measurement process pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
 
     total_time_delta = time.time() - start_time
-    print("Loaded {} definitions in {} secs".format(len(def_dim_id_set), total_time_delta))
+    print("Loaded {0} definitions in {1:.2f} secs".format(len(def_dim_id_set), total_time_delta))
     print("{0:.0f} def/sec\n".format(len(def_dim_id_set) / total_time_delta))
 
 
@@ -567,7 +571,7 @@ def run_query(query):
                "-c", query]
 
     sub_output = subprocess.check_output(command)
-    return '\n'.join(sub_output.splitlines()[2:-2])
+    return [line.strip() for line in sub_output.splitlines()[2:-2]]
 
 
 def vertica_db_filler():
@@ -578,15 +582,16 @@ def vertica_db_filler():
                 "TRUNCATE TABLE MonMetrics.Dimensions; " \
                 "TRUNCATE TABLE MonMetrics.Measurements;"
         run_query(query)
-
     print("Creating metric history for {} days".format(DAYS_TO_FILL))
     fill_metrics(START_DAY, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
 
     print("Checking if data arrived...")
-    print(" DefinitionDimensions")
-    print(run_query("SELECT count(*) FROM MonMetrics.DefinitionDimensions;"))
-    print(" Measurements")
-    print(run_query("SELECT count(*) FROM MonMetrics.Measurements;"))
+    print("DefinitionDimensions")
+    results = run_query("SELECT count(*) FROM MonMetrics.DefinitionDimensions;")
+    print('\n'.join(results))
+    print("Measurements")
+    results = run_query("SELECT count(*) FROM MonMetrics.Measurements;")
+    print('\n'.join(results))
 
     print('Finished loading VDB')
 
