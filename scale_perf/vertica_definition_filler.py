@@ -58,13 +58,13 @@ DIMENSIIONS_FILENAME = '/tmp/dimensions.dat'
 
 MEASUREMENTS_FILENAME = '/tmp/measurements.dat'
 
-DEFINITION_COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
+DEFINITION_COPY_QUERY = "COPY DIRECT MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
                         "DELIMITER ',' COMMIT; " \
-                        "COPY MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
+                        "COPY DIRECT MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
                         "DELIMITER ',' COMMIT; " \
-                        "COPY MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
+                        "COPY DIRECT MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
                         "DELIMITER ',' COMMIT; "
-MEASUREMENT_COPY_QUERY = "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
+MEASUREMENT_COPY_QUERY = "COPY DIRECT MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
                          "DELIMITER ',' COMMIT; "
 
 def_id_set = set()
