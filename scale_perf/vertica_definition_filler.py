@@ -28,8 +28,9 @@ NEW_VMS_PER_HOUR = 80
 # Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
 VMS_BELOW_PROBATION = 8
 
-# start day, relative to the current date
-START_DAY = -41
+# start day
+BASE_TIMESTAMP = datetime.datetime.utcnow() - datetime.timedelta(days=45)
+# BASE_TIMESTAMP = datetime.datetime.strptime("2016-01-01T00:00:00")
 # number of days to fill
 DAYS_TO_FILL = 4
 
@@ -47,7 +48,7 @@ REGION = "Region 1"
 TOTAL_VM_TENANTS = 256
 
 # number of definitions to store in memory before writing to vertica
-LOCAL_STORAGE_MAX = 100000
+LOCAL_STORAGE_MAX = 1000000
 
 
 DEF_DIMS_FILENAME = '/tmp/defdims.dat'
@@ -58,14 +59,14 @@ DIMENSIIONS_FILENAME = '/tmp/dimensions.dat'
 
 MEASUREMENTS_FILENAME = '/tmp/measurements.dat'
 
-DEFINITION_COPY_QUERY = "COPY DIRECT MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
-                        "DELIMITER ',' COMMIT; " \
-                        "COPY DIRECT MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
-                        "DELIMITER ',' COMMIT; " \
-                        "COPY DIRECT MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
-                        "DELIMITER ',' COMMIT; "
-MEASUREMENT_COPY_QUERY = "COPY DIRECT MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
-                         "DELIMITER ',' COMMIT; "
+DEFINITION_COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
+                        "DELIMITER ',' DIRECT COMMIT; " \
+                        "COPY MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
+                        "DELIMITER ',' DIRECT COMMIT; " \
+                        "COPY MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
+                        "DELIMITER ',' DIRECT COMMIT; "
+MEASUREMENT_COPY_QUERY = "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
+                         "DELIMITER ',' DIRECT COMMIT; "
 
 def_id_set = set()
 dim_id_set = set()
@@ -489,7 +490,7 @@ def id_generator(size=32, chars=string.hexdigits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-def fill_metrics(start_day, days_to_fill, new_vms_per_hour, vms_below_probation):
+def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_probation):
     measurement_process_pool = Pool(total_measurement_processes)
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
@@ -507,8 +508,7 @@ def fill_metrics(start_day, days_to_fill, new_vms_per_hour, vms_below_probation)
 
     initial_id_set_size = len(def_dim_id_set)
     start_time = time.time()
-    base_timestamp = datetime.datetime.utcnow()
-    for x in xrange(start_day, start_day + days_to_fill):
+    for x in xrange(days_to_fill):
         for y in xrange(24):
             timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
             active_vms = []
@@ -583,7 +583,7 @@ def vertica_db_filler():
                 "TRUNCATE TABLE MonMetrics.Measurements;"
         run_query(query)
     print("Creating metric history for {} days".format(DAYS_TO_FILL))
-    fill_metrics(START_DAY, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
+    fill_metrics(BASE_TIMESTAMP, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
 
     print("Checking if data arrived...")
     print("DefinitionDimensions")
