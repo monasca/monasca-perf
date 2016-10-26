@@ -90,19 +90,19 @@ def run_queries():
     results = metric_list(args)
     print_results(results)
 
-    print("\nName only query")
+    print("\nMetric-list | Name only ")
     args = {'name': metric_name}
     results = metric_list(args)
     print_results(results)
 
     time_stamp = datetime.datetime.utcnow() - datetime.timedelta(minutes=300)
-    print("\nName and start time query")
+    print("\nMetric-list | Name and start time")
     args = {'name': metric_name,
             'start_time': time_stamp.isoformat()}
     results = metric_list(args)
     print_results(results)
 
-    print("\nName and max dimensions query (single result)")
+    print("\nMetric-list | Name and max dimensions (single result)")
     args = {'name': metric_name,
             "dimensions": {
                 "hostname": "test_vm_host_" + resource_id,
@@ -116,7 +116,7 @@ def run_queries():
     results = metric_list(args)
     print_results(results)
 
-    print("\nName and max dimensions query (max results)")
+    print("\nMetric-list | Name and max dimensions (max results)")
     args = {'name': metric_name,
             'dimensions': {
                 'zone': 'nova',
@@ -128,14 +128,14 @@ def run_queries():
     results = metric_list(args)
     print_results(results)
 
-    print("\nDimensions only, resource_id query (single vm results)")
+    print("\nMetric-list | Dimensions only, resource_id (single vm results)")
     args = {'dimensions': {
         "resource_id": resource_id
     }}
     results = metric_list(args)
     print_results(results)
 
-    print("\nDimensions only, resource_id and device query (single device result)")
+    print("\nMetric-list | Dimensions only, resource_id and device (single device result)")
     args = {'dimensions': {
         "resource_id": resource_id,
         "device": device
@@ -143,28 +143,42 @@ def run_queries():
     results = metric_list(args)
     print_results(results)
 
-    print("\nDimensions only, device query (multiple devices over multiple vms results)")
+    print("\nMetric-list | Dimensions only, device (multiple devices over multiple vms result)")
     args = {'dimensions': {
         "device": device
     }}
     results = metric_list(args)
     print_results(results)
 
-    print("\nMeasurements name only merged (non-vm metric)")
+    print("\nMeasurement-list | Name only merged (non-vm metric)")
     args = {'name': 'cpu.idle_perc',
             'start_time': '2016-01-01T00:00:00.000Z',
             'merge_metrics': 'true'}
     results = measurement_list(args)
     print_results(results)
 
-    print("\nMeasurements name only merged (vm metric)")
+    print("\nMeasurement-list | Name only grouped (non-vm metric)")
+    args = {'name': 'cpu.idle_perc',
+            'start_time': '2016-01-01T00:00:00.000Z',
+            'group_by': '*'}
+    results = measurement_list(args)
+    print_results(results)
+
+    print("\nMeasurement-list | Name only merged (vm metric)")
     args = {'name': 'vm.mem.free_perc',
             'start_time': '2016-01-01T00:00:00.000Z',
             'merge_metrics': 'true'}
     results = measurement_list(args)
     print_results(results)
 
-    print("\nMeasurements name and resource_id (single result)")
+    print("\nMeasurement-list | Name only grouped (vm metric)")
+    args = {'name': 'vm.mem.free_perc',
+            'start_time': '2016-01-01T00:00:00.000Z',
+            'group_by': '*'}
+    results = measurement_list(args)
+    print_results(results)
+
+    print("\nMeasurement-list | Name and resource_id (single result)")
     args = {'name': 'vm.mem.free_perc',
             'dimensions': {
                 'resource_id': resource_id
@@ -174,7 +188,7 @@ def run_queries():
     results = measurement_list(args)
     print_results(results)
 
-    print("\nMeasurements name and max dimensions query (max results)")
+    print("\nMeasurement-list | Name and max dimensions query (max results)")
     args = {'name': metric_name,
             'dimensions': {
                 'zone': 'nova',
@@ -188,7 +202,7 @@ def run_queries():
     results = measurement_list(args)
     print_results(results)
 
-    print("\nStatistics name only merged (non-vm metric)")
+    print("\nMetric-statistics | name only merged (non-vm metric)")
     args = {'name': 'cpu.idle_perc',
             'statistics': 'max',
             'start_time': '2016-01-01T00:00:00.000Z',
@@ -196,7 +210,7 @@ def run_queries():
     results = statistics_list(args)
     print_results(results)
 
-    print("\nStatistics name only merged (vm metric)")
+    print("\nMetric-statistics | name only merged (vm metric)")
     args = {'name': 'vm.mem.free_perc',
             'statistics': 'max',
             'start_time': '2016-01-01T00:00:00.000Z',
@@ -204,7 +218,7 @@ def run_queries():
     results = statistics_list(args)
     print_results(results)
 
-    print("\nStatistics name and resource_id (single result)")
+    print("\nMetric-statistics | name and resource_id (single result)")
     args = {'name': 'vm.mem.free_perc',
             'dimensions': {
                 'resource_id': resource_id
@@ -215,7 +229,7 @@ def run_queries():
     results = statistics_list(args)
     print_results(results)
 
-    print("\nStatistics name and max dimensions query (max results)")
+    print("\nMetric-statistics | name and max dimensions query (max results)")
     args = {'name': metric_name,
             'dimensions': {
                 'zone': 'nova',
