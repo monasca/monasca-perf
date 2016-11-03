@@ -2,7 +2,6 @@ import argparse
 
 from influxdb import InfluxDBClient
 
-NUMBER_OF_MEASUREMENTS_TO_INSERT = 2000000
 NUMBER_OF_UNIQUE_METRICS = 1000
 
 
@@ -14,22 +13,21 @@ def main(host='localhost', port=8086, metric_name='KS', num_clients=4):
     db_name = 'monasca'
     client = InfluxDBClient(host, port, user, password, db_name)
 
-    db_user = 'test_user'
+    db_user = 'admin'
     db_user_password = 'my_secret_password'
 
     print "Switch user: {}".format(db_user)
     client.switch_user(db_user, db_user_password)
 
-    query = 'SELECT count(value) FROM /metric_*/'
-    print "Querying data: {}".format(query)
-    result = client.query(query)
     total_measurements = 0
     for i in xrange(1, num_clients + 1):
         measurements_per_client = 0
         for j in xrange(NUMBER_OF_UNIQUE_METRICS):
-            metric_points = list(result.get_points(measurement='metric_{0}_{1}_{2}'.format(
+            query = 'SELECT count(value) FROM /metric_{0}_{1}_{2}/'.format(metric_name, i, j)
+            result = client.query(query)
+            metric_point = list(result.get_points(measurement='metric_{0}_{1}_{2}'.format(
                 metric_name, i, j)))
-            count_result = metric_points[0]['count']
+            count_result = metric_point[0]['count']
             measurements_per_client += count_result
         print "{0} measurements per client # {1} = {2}".format(
             metric_name, i, measurements_per_client)
@@ -53,4 +51,3 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     main(host=args.host, port=args.port, metric_name=args.metric_name, num_clients=args.num_clients)
-
