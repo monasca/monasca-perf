@@ -34,7 +34,7 @@ VMS_BELOW_PROBATION = 8
 BASE_TIMESTAMP = datetime.datetime.utcnow() - datetime.timedelta(days=45)
 # BASE_TIMESTAMP = datetime.datetime.strptime("2016-01-01T00:00:00")
 # number of days to fill
-DAYS_TO_FILL = 4
+DAYS_TO_FILL = 1  # 4
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
@@ -53,13 +53,13 @@ TOTAL_VM_TENANTS = 256
 LOCAL_STORAGE_MAX = 1000000
 
 
-DEF_DIMS_FILENAME = '/tmp/defdims.dat'
+DEF_DIMS_FILENAME = './defdims.txt'
 
-DEFINITIONS_FILENAME = '/tmp/definitions.dat'
+DEFINITIONS_FILENAME = './definitions.txt'
 
-DIMENSIIONS_FILENAME = '/tmp/dimensions.dat'
+DIMENSIIONS_FILENAME = './dimensions.txt'
 
-MEASUREMENTS_FILENAME = '/tmp/measurements.dat'
+MEASUREMENTS_FILENAME = './measurements.txt'
 
 DEFINITION_COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
                         "DELIMITER ',' DIRECT COMMIT; " \
@@ -78,7 +78,7 @@ dims_list = []
 def_dims_list = []
 
 measurement_process_id = 0
-total_measurement_processes = 5
+TOTAL_MEASUREMENT_PROCESSES = 5
 
 next_hostname_id = 1
 measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
@@ -497,7 +497,7 @@ def id_generator(size=32, chars=string.hexdigits):
 
 
 def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_probation):
-    measurement_process_pool = Pool(total_measurement_processes)
+    measurement_process_pool = Pool(TOTAL_MEASUREMENT_PROCESSES)
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
 
@@ -549,14 +549,14 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
             # submit definitions in batches to avoid
             # using lots of memory and making long queries
             if len(def_dims_list) > LOCAL_STORAGE_MAX:
-                print("Flushing Definitions")
+                print("Flushing Definitions 1")
                 flush_definition_data()
                 delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
                 print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
 
     # insert any remaining definitions
     if len(def_dims_list) > 0:
-        print("Flushing Definitions")
+        print("Flushing Definitions 2")
         flush_definition_data()
         delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
         print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
@@ -579,6 +579,10 @@ def influx_db_filler():
     if CLEAR_METRICS:
         print("Removing all influxdb data")
         client.drop_database(DATABASE_NAME)
+        # delete_cmd = 'rm measurements* defdims.txt definitions.txt dimensions.txt'
+        # delete_cmd = 'sudo rm -rf .influxdb/ /var/lib/influxdb/* /root/.influxdb/ ~/.influxdb/* ~/.influx_history/* '
+        # subprocess.Popen(delete_cmd)
+
     print("Creating metric history for {} days".format(DAYS_TO_FILL))
     fill_metrics(BASE_TIMESTAMP, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
 
