@@ -3,7 +3,6 @@ import hashlib
 import random
 import os
 import string
-import subprocess
 import sys
 import time
 import uuid
@@ -32,7 +31,6 @@ VMS_BELOW_PROBATION = 8
 
 # start day
 BASE_TIMESTAMP = datetime.datetime.utcnow() - datetime.timedelta(days=45)
-# BASE_TIMESTAMP = datetime.datetime.strptime("2016-01-01T00:00:00")
 # number of days to fill
 DAYS_TO_FILL = 1  # 4
 
@@ -52,23 +50,7 @@ TOTAL_VM_TENANTS = 256
 # number of definitions to store in memory before writing to influxdb
 LOCAL_STORAGE_MAX = 1000000
 
-
-DEF_DIMS_FILENAME = './defdims.txt'
-
-DEFINITIONS_FILENAME = './definitions.txt'
-
-DIMENSIIONS_FILENAME = './dimensions.txt'
-
 MEASUREMENTS_FILENAME = './measurements.txt'
-
-DEFINITION_COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
-                        "DELIMITER ',' DIRECT COMMIT; " \
-                        "COPY MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
-                        "DELIMITER ',' DIRECT COMMIT; " \
-                        "COPY MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
-                        "DELIMITER ',' DIRECT COMMIT; "
-MEASUREMENT_COPY_QUERY = "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
-                         "DELIMITER ',' DIRECT COMMIT; "
 
 def_id_set = set()
 dim_id_set = set()
@@ -86,7 +68,16 @@ measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
 ID_SIZE = 20
 
 DATABASE_NAME = 'monasca'
-client = InfluxDBClient('localhost', 8086, 'root', 'root', )
+client = InfluxDBClient('localhost', 8086, 'root', 'root', DATABASE_NAME)
+
+print "Creating database: {}...".format(DATABASE_NAME)
+client.create_database(DATABASE_NAME)
+
+db_user = 'admin'
+db_user_password = 'my_secret_password'
+
+print "Switch user: {}".format(db_user)
+client.switch_user(db_user, db_user_password)
 
 
 class vmSimulator(object):
@@ -173,8 +164,6 @@ class vmSimulator(object):
                          "vm.io.write_ops_sec"]
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
-                            # "vm.vswitch.in_bits",
-                            # "vm.vswitch.in_bits_sec",
                             "vm.vswitch.in_packets",
                             "vm.vswitch.in_packets_sec",
                             "vm.vswitch.in_dropped",
@@ -183,8 +172,6 @@ class vmSimulator(object):
                             "vm.vswitch.in_errors_sec",
                             "vm.vswitch.out_bytes",
                             "vm.vswitch.out_bytes_sec",
-                            # "vm.vswitch.out_bits",
-                            # "vm.vswitch.out_bits_sec",
                             "vm.vswitch.out_packets",
                             "vm.vswitch.out_packets_sec",
                             "vm.vswitch.out_dropped",
@@ -193,8 +180,6 @@ class vmSimulator(object):
                             "vm.vswitch.out_errors_sec",
                             "vswitch.in_bytes",
                             "vswitch.in_bytes_sec",
-                            # "vswitch.in_bits",
-                            # "vswitch.in_bits_sec",
                             "vswitch.in_packets",
                             "vswitch.in_packets_sec",
                             "vswitch.in_dropped",
@@ -203,8 +188,6 @@ class vmSimulator(object):
                             "vswitch.in_errors_sec",
                             "vswitch.out_bytes",
                             "vswitch.out_bytes_sec",
-                            # "vswitch.out_bits",
-                            # "vswitch.out_bits_sec",
                             "vswitch.out_packets",
                             "vswitch.out_packets_sec",
                             "vswitch.out_dropped",
@@ -282,7 +265,11 @@ class vmSimulator(object):
                                             dimensions=dimensions,
                                             tenant_id=tenant_id,
                                             region=REGION)
-            self.metric_ids.add(metric_id)
+            self.metric_ids.add((metric_id, name, tenant_id, REGION,
+                                 dimensions['cloud_name'], dimensions['cluster'],
+                                 dimensions['service'], dimensions['resource_id'],
+                                 dimensions['zone'], dimensions['component'],
+                                 dimensions['hostname'], dimensions['lifespan']))
 
         for name in vmSimulator.disk_agg_metric_names:
             dimensions = self.base_dimensions.copy()
@@ -296,8 +283,11 @@ class vmSimulator(object):
                                             dimensions=dimensions,
                                             tenant_id=tenant_id,
                                             region=REGION)
-            self.disk_metric_ids.add(metric_id)
-
+            self.metric_ids.add((metric_id, name, tenant_id, REGION,
+                                 dimensions['cloud_name'], dimensions['cluster'],
+                                 dimensions['service'], dimensions['resource_id'],
+                                 dimensions['zone'], dimensions['component'],
+                                 dimensions['hostname'], dimensions['lifespan']))
         for name in vmSimulator.disk_metric_names:
             for disk in vmSimulator.disks:
                 dimensions = self.base_dimensions.copy()
@@ -312,7 +302,11 @@ class vmSimulator(object):
                                                 dimensions=dimensions,
                                                 tenant_id=tenant_id,
                                                 region=REGION)
-                self.disk_metric_ids.add(metric_id)
+            self.metric_ids.add((metric_id, name, tenant_id, REGION,
+                                 dimensions['cloud_name'], dimensions['cluster'],
+                                 dimensions['service'], dimensions['resource_id'],
+                                 dimensions['zone'], dimensions['component'],
+                                 dimensions['hostname'], dimensions['lifespan']))
 
         for name in vmSimulator.network_metric_names:
             for device in vmSimulator.network_devices:
@@ -328,7 +322,11 @@ class vmSimulator(object):
                                                 dimensions=dimensions,
                                                 tenant_id=tenant_id,
                                                 region=REGION)
-                self.metric_ids.add(metric_id)
+            self.metric_ids.add((metric_id, name, tenant_id, REGION,
+                                 dimensions['cloud_name'], dimensions['cluster'],
+                                 dimensions['service'], dimensions['resource_id'],
+                                 dimensions['zone'], dimensions['component'],
+                                 dimensions['hostname'], dimensions['lifespan']))
 
         for name in vmSimulator.vswitch_metric_names:
             for switch in vmSimulator.vswitches:
@@ -344,7 +342,11 @@ class vmSimulator(object):
                                                 dimensions=dimensions,
                                                 tenant_id=tenant_id,
                                                 region=REGION)
-                self.vswitch_metric_ids.add(metric_id)
+            self.metric_ids.add((metric_id, name, tenant_id, REGION,
+                                 dimensions['cloud_name'], dimensions['cluster'],
+                                 dimensions['service'], dimensions['resource_id'],
+                                 dimensions['zone'], dimensions['component'],
+                                 dimensions['hostname'], dimensions['lifespan']))
 
     def get_metric_ids(self, cycle=None):
         result = set()
@@ -366,22 +368,19 @@ class vmSimulator(object):
 
         return result
 
-    def create_measurements(self, timestamp=None):
+    def create_measurements(self):
         if self.current_cycle >= self.lifespan_cycles:
             return []
-
-        if timestamp is None:
-            second_delta = self.seconds_per_cycle * self.current_cycle
-            timestamp = self.created_timestamp + datetime.timedelta(seconds=second_delta)
-            timestamp = timestamp.strftime('%Y-%m-%d %H:%M:%S')
 
         meas_list = []
         for metric_id in self.get_metric_ids(self.current_cycle):
             value = str(random.randint(0, 1000000))
-            meas_list.append(','.join([metric_id, timestamp, value]) + '\n')
+            meas_list.append('{},cloud_name={},cluster={},service={},resource_id={},zone={},component={},hostname={},lifespan={} value={},metric_id="{}",tenant_id="{}",region="{}"'.format(
+                metric_id[1], metric_id[4], metric_id[5], metric_id[6], metric_id[7], metric_id[8],
+                metric_id[9], metric_id[10], metric_id[11], value, metric_id[0], metric_id[2],
+                metric_id[3]))
         self.current_cycle += 1
         return meas_list
-
 
     @staticmethod
     def get_total_metric_defs():
@@ -395,17 +394,13 @@ class vmSimulator(object):
 
 
 def add_measurement_batch(vm_list, filename=MEASUREMENTS_FILENAME):
-    meas_list = []
-    while True:
-        new_measurements = []
-        for vm in vm_list:
-            new_measurements.extend(vm.create_measurements())
-
-        if len(new_measurements) == 0:
-            break
-        meas_list.extend(new_measurements)
-
-    flush_measurement_data(meas_list, filename)
+    new_measurements = []
+    for vm in vm_list:
+        new_measurements.extend(vm.create_measurements())
+        if len(new_measurements) >= 5000:
+            flush_measurement_data(new_measurements, filename)
+            new_measurements = []
+    flush_measurement_data(new_measurements, filename)
 
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
@@ -455,41 +450,10 @@ def set_dimension_values(active_dimensions, base_dimensions, day, hour, definiti
                                                              definition=definition)
 
 
-def flush_definition_data():
-    global def_dims_list
-    def_dims_temp = open(DEF_DIMS_FILENAME, 'w')
-    def_dims_temp.write('\n'.join(def_dims_list) + '\n')
-    def_dims_temp.close()
-    def_dims_list = []
-
-    global def_list
-    def_temp = open(DEFINITIONS_FILENAME, 'w')
-    def_temp.write('\n'.join(def_list) + '\n')
-    def_temp.close()
-    def_list = []
-
-    global dims_list
-    dims_temp = open(DIMENSIIONS_FILENAME, 'w')
-    dims_temp.write('\n'.join(dims_list) + '\n')
-    dims_temp.close()
-    dims_list = []
-
-    query = DEFINITION_COPY_QUERY.format(DEF_DIMS_FILENAME,
-                                         DEFINITIONS_FILENAME,
-                                         DIMENSIIONS_FILENAME)
-    run_query(query)
-
-
 def flush_measurement_data(meas_list, filename):
-    meas_temp = open(filename, 'w')
-    meas_temp.write('\n'.join(meas_list) + '\n')
-    meas_temp.close()
-
-    query = MEASUREMENT_COPY_QUERY.format(filename)
-
-    run_query(query)
-
-    os.remove(filename)
+    print "write_points batch size: {}".format(len(meas_list))
+    client.write_points(meas_list, batch_size=len(meas_list),
+                        time_precision='ms', protocol='line')
 
 
 def id_generator(size=32, chars=string.hexdigits):
@@ -501,10 +465,6 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
 
-    metrics_per_vm = vmSimulator.get_total_metric_defs()
-    expected_definitions = (days_to_fill * 24 *
-                            (NEW_VMS_PER_HOUR + VMS_BELOW_PROBATION) * metrics_per_vm)
-
     seconds_per_cycle = 30 if FULL_MEASUREMENTS else 3600  # 30 sec or 1 hour
     cycles_per_hour = 3600 / seconds_per_cycle
     churn_lifespan = (TOTAL_ACTIVE_VMS / NEW_VMS_PER_HOUR) * cycles_per_hour
@@ -512,7 +472,6 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
 
     standard_lifespan = min(churn_lifespan, available_lifespan)
 
-    initial_id_set_size = len(def_dim_id_set)
     start_time = time.time()
     for x in xrange(days_to_fill):
         for y in xrange(24):
@@ -537,63 +496,31 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
                                               seconds_per_cycle=seconds_per_cycle))
                 next_hostname_id += 1
 
-            # if len(active_vms) > TOTAL_ACTIVE_VMS:
-            #     active_vms = active_vms[new_vms_per_hour:]
-
             global measurement_process_id
+            global total_num_meas
+            print "add measurement batch for process id = {}".format(measurement_process_id)
             measurement_process_pool.apply_async(add_measurement_batch,
                                                  args=(active_vms,
-                                                       MEASUREMENTS_FILENAME + str(measurement_process_id,)))
+                                                       MEASUREMENTS_FILENAME +
+                                                       str(measurement_process_id,)))
             measurement_process_id += 1
-
-            # submit definitions in batches to avoid
-            # using lots of memory and making long queries
-            if len(def_dims_list) > LOCAL_STORAGE_MAX:
-                print("Flushing Definitions 1")
-                flush_definition_data()
-                delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
-                print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
-
-    # insert any remaining definitions
-    if len(def_dims_list) > 0:
-        print("Flushing Definitions 2")
-        flush_definition_data()
-        delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
-        print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
 
     print("Waiting for measurement process pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
 
     total_time_delta = time.time() - start_time
-    print("Loaded {0} definitions in {1:.2f} secs".format(len(def_dim_id_set), total_time_delta))
-    print("{0:.0f} def/sec\n".format(len(def_dim_id_set) / total_time_delta))
-
-
-def run_query(query):
-    result = client.query(query)
-    return result
+    print "total time delta = {}".format(total_time_delta)
 
 
 def influx_db_filler():
-    if CLEAR_METRICS:
-        print("Removing all influxdb data")
-        client.drop_database(DATABASE_NAME)
-        # delete_cmd = 'rm measurements* defdims.txt definitions.txt dimensions.txt'
-        # delete_cmd = 'sudo rm -rf .influxdb/ /var/lib/influxdb/* /root/.influxdb/ ~/.influxdb/* ~/.influx_history/* '
-        # subprocess.Popen(delete_cmd)
-
     print("Creating metric history for {} days".format(DAYS_TO_FILL))
     fill_metrics(BASE_TIMESTAMP, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
-
     print("Checking if data arrived...")
     print("DefinitionDimensions")
-    results = run_query("SELECT count(*) FROM MonMetrics.DefinitionDimensions;")
-    print('\n'.join(results))
-    print("Measurements")
-    results = run_query("SELECT count(*) FROM MonMetrics.Measurements;")
-    print('\n'.join(results))
-
+    query = 'SHOW series limit 1'
+    result = client.query(query)
+    print "Result = {}".format(result)
     print('Finished loading InfluxDB')
 
 
