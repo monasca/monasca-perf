@@ -1,7 +1,6 @@
 import datetime
 import hashlib
 import random
-import os
 import string
 import sys
 import time
@@ -14,6 +13,9 @@ from multiprocessing import Pool
     This will simulate a number of days worth of metric definition history.
 """
 
+# number of days to fill
+DAYS_TO_FILL = 3  # 4
+
 # Clear the current metrics from the DB for testing
 CLEAR_METRICS = True
 
@@ -21,18 +23,16 @@ CLEAR_METRICS = True
 FULL_MEASUREMENTS = False
 
 # Total vms active at one time
-TOTAL_ACTIVE_VMS = 800
+TOTAL_ACTIVE_VMS = 8000  # this gives 2.23 million measurements per day
 
 # Number of new vms per hour.
-NEW_VMS_PER_HOUR = 80
+NEW_VMS_PER_HOUR = 800
 
 # Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
 VMS_BELOW_PROBATION = 8
 
 # start day
 BASE_TIMESTAMP = datetime.datetime.utcnow() - datetime.timedelta(days=45)
-# number of days to fill
-DAYS_TO_FILL = 1  # 4
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
@@ -84,6 +84,8 @@ class vmSimulator(object):
     disks = ['sda', 'sdb', 'sdc']
     vswitches = ['vs1', 'vs2', 'vs3']
     network_devices = ['tap1']
+    # 126 total
+    # 24 metric_names
     metric_names = ["cpu.time_ns",
                     "cpu.utilization_norm_perc",
                     "cpu.utilization_perc",
@@ -108,6 +110,7 @@ class vmSimulator(object):
                     "vm.mem.total_mb",
                     "vm.mem.used_mb",
                     "vm.ping_status"]
+    # 26 disk_agg_metric_names
     disk_agg_metric_names = ["disk.allocation_total",
                              "disk.capacity_total",
                              "disk.physical_total",
@@ -134,6 +137,7 @@ class vmSimulator(object):
                              "vm.io.write_bytes_total_sec",
                              "vm.io.write_ops_total",
                              "vm.io.write_ops_total_sec"]
+    # 28 disk_metric_names
     disk_metric_names = ["disk.allocation",
                          "disk.capacity",
                          "disk.ephemeral.size",
@@ -162,6 +166,7 @@ class vmSimulator(object):
                          "vm.io.write_bytes_sec",
                          "vm.io.write_ops",
                          "vm.io.write_ops_sec"]
+    # 32 vswitch_metric_names
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
                             "vm.vswitch.in_packets",
@@ -194,6 +199,7 @@ class vmSimulator(object):
                             "vswitch.out_dropped_sec",
                             "vswitch.out_errors",
                             "vswitch.out_errors_sec"]
+    # 16 network_metric_names
     network_metric_names = ["net.in_bytes",
                             "net.in_bytes_sec",
                             "net.in_packets",
