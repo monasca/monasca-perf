@@ -491,27 +491,26 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
     start_time = time.time()
     for x in xrange(days_to_fill):
         for y in xrange(24):
-            for i in xrange(measurements_per_hour):
-                timestamp = base_timestamp + datetime.timedelta(days=x, hours=y, minutes=i)
-                active_vms = []
-                for z in xrange(new_vms_per_hour + vms_below_probation):
-                    global next_hostname_id
-                    resource_id = uuid.uuid4()
+            timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
+            active_vms = []
+            for z in xrange(new_vms_per_hour + vms_below_probation):
+                global next_hostname_id
+                resource_id = uuid.uuid4()
 
-                    if z < vms_below_probation:
-                        lifespan_cycles = 1
-                    else:
-                        lifespan_cycles = standard_lifespan
+                if z < VMS_BELOW_PROBATION:
+                    lifespan_cycles = 1
+                else:
+                    lifespan_cycles = standard_lifespan
 
-                    active_vms.append(vmSimulator(resource_id=resource_id,
-                                                  hostname='test_' + str(next_hostname_id),
-                                                  admin_tenant_id=TENANT_ID,
-                                                  tenant_id=random.choice(vm_tenant_ids),
-                                                  region=REGION,
-                                                  created_timestamp=timestamp,
-                                                  lifespan_cycles=lifespan_cycles,
-                                                  seconds_per_cycle=seconds_per_cycle))
-                    next_hostname_id += 1
+                active_vms.append(vmSimulator(resource_id=resource_id,
+                                              hostname='test_' + str(next_hostname_id),
+                                              admin_tenant_id=TENANT_ID,
+                                              tenant_id=random.choice(vm_tenant_ids),
+                                              region=REGION,
+                                              created_timestamp=timestamp,
+                                              lifespan_cycles=lifespan_cycles,
+                                              seconds_per_cycle=seconds_per_cycle))
+                next_hostname_id += 1
 
                 global measurement_process_id
                 global total_num_meas

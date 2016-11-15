@@ -4,7 +4,7 @@ declare -r num_client=1
 rm data*
 rm system_info
 
-for i in 1 # $(seq 1 $num_client)
+for i in $(seq 1 $num_client)
 do
    echo "Running # $i"
    (pypy ./influx_insert_line_protocol.py --port 8086 --client_num $i >> data.txt) &
