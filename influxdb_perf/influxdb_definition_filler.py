@@ -14,13 +14,13 @@ from multiprocessing import Pool
 """
 
 # number of days to fill
-DAYS_TO_FILL = 3  # 4
+DAYS_TO_FILL = 1  # 4
 
 # Clear the current metrics from the DB for testing
 CLEAR_METRICS = True
 
 # Add metrics every 30 seconds for the full measurement load (false, send only one metric per hour)
-FULL_MEASUREMENTS = False
+FULL_MEASUREMENTS = True
 
 # Total vms active at one time
 TOTAL_ACTIVE_VMS = 8000  # this gives 2.23 million measurements per day
@@ -84,7 +84,7 @@ class vmSimulator(object):
     disks = ['sda', 'sdb', 'sdc']
     vswitches = ['vs1', 'vs2', 'vs3']
     network_devices = ['tap1']
-    # 126 total
+    # 242 total
     # 24 metric_names
     metric_names = ["cpu.time_ns",
                     "cpu.utilization_norm_perc",
@@ -110,7 +110,7 @@ class vmSimulator(object):
                     "vm.mem.total_mb",
                     "vm.mem.used_mb",
                     "vm.ping_status"]
-    # 26 disk_agg_metric_names
+    # 78 disk_agg_metric_names 26*3=78
     disk_agg_metric_names = ["disk.allocation_total",
                              "disk.capacity_total",
                              "disk.physical_total",
@@ -166,7 +166,7 @@ class vmSimulator(object):
                          "vm.io.write_bytes_sec",
                          "vm.io.write_ops",
                          "vm.io.write_ops_sec"]
-    # 32 vswitch_metric_names
+    # 96 vswitch_metric_names 32*3=96
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
                             "vm.vswitch.in_packets",
@@ -294,6 +294,7 @@ class vmSimulator(object):
                                  dimensions['service'], dimensions['resource_id'],
                                  dimensions['zone'], dimensions['component'],
                                  dimensions['hostname'], dimensions['lifespan']))
+
         for name in vmSimulator.disk_metric_names:
             for disk in vmSimulator.disks:
                 dimensions = self.base_dimensions.copy()
@@ -312,7 +313,8 @@ class vmSimulator(object):
                                  dimensions['cloud_name'], dimensions['cluster'],
                                  dimensions['service'], dimensions['resource_id'],
                                  dimensions['zone'], dimensions['component'],
-                                 dimensions['hostname'], dimensions['lifespan']))
+                                 dimensions['hostname'], dimensions['lifespan'],
+                                 dimensions['device']))
 
         for name in vmSimulator.network_metric_names:
             for device in vmSimulator.network_devices:
@@ -332,7 +334,8 @@ class vmSimulator(object):
                                  dimensions['cloud_name'], dimensions['cluster'],
                                  dimensions['service'], dimensions['resource_id'],
                                  dimensions['zone'], dimensions['component'],
-                                 dimensions['hostname'], dimensions['lifespan']))
+                                 dimensions['hostname'], dimensions['lifespan'],
+                                 dimensions['device']))
 
         for name in vmSimulator.vswitch_metric_names:
             for switch in vmSimulator.vswitches:
@@ -352,7 +355,8 @@ class vmSimulator(object):
                                  dimensions['cloud_name'], dimensions['cluster'],
                                  dimensions['service'], dimensions['resource_id'],
                                  dimensions['zone'], dimensions['component'],
-                                 dimensions['hostname'], dimensions['lifespan']))
+                                 dimensions['hostname'], dimensions['lifespan'],
+                                 dimensions['device']))
 
     def get_metric_ids(self, cycle=None):
         result = set()
@@ -381,10 +385,16 @@ class vmSimulator(object):
         meas_list = []
         for metric_id in self.get_metric_ids(self.current_cycle):
             value = str(random.randint(0, 1000000))
-            meas_list.append('{},cloud_name={},cluster={},service={},resource_id={},zone={},component={},hostname={},lifespan={} value={},metric_id="{}",tenant_id="{}",region="{}"'.format(
-                metric_id[1], metric_id[4], metric_id[5], metric_id[6], metric_id[7], metric_id[8],
-                metric_id[9], metric_id[10], metric_id[11], value, metric_id[0], metric_id[2],
-                metric_id[3]))
+            if len(metric_id) == 13:
+                meas_list.append('{},cloud_name={},cluster={},service={},resource_id={},zone={},component={},hostname={},lifespan={},device={} value={},metric_id="{}",tenant_id="{}",region="{}"'.format(
+                    metric_id[1], metric_id[4], metric_id[5], metric_id[6], metric_id[7], metric_id[8],
+                    metric_id[9], metric_id[10], metric_id[11], metric_id[12], value, metric_id[0], metric_id[2],
+                    metric_id[3]))
+            else:
+                meas_list.append('{},cloud_name={},cluster={},service={},resource_id={},zone={},component={},hostname={},lifespan={} value={},metric_id="{}",tenant_id="{}",region="{}"'.format(
+                    metric_id[1], metric_id[4], metric_id[5], metric_id[6], metric_id[7], metric_id[8],
+                    metric_id[9], metric_id[10], metric_id[11], value, metric_id[0], metric_id[2],
+                    metric_id[3]))
         self.current_cycle += 1
         return meas_list
 
@@ -481,35 +491,36 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
     start_time = time.time()
     for x in xrange(days_to_fill):
         for y in xrange(24):
-            timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
-            active_vms = []
-            for z in xrange(new_vms_per_hour + vms_below_probation):
-                global next_hostname_id
-                resource_id = uuid.uuid4()
+            for i in xrange(measurements_per_hour):
+                timestamp = base_timestamp + datetime.timedelta(days=x, hours=y, minutes=i)
+                active_vms = []
+                for z in xrange(new_vms_per_hour + vms_below_probation):
+                    global next_hostname_id
+                    resource_id = uuid.uuid4()
 
-                if z < vms_below_probation:
-                    lifespan_cycles = 1
-                else:
-                    lifespan_cycles = standard_lifespan
+                    if z < vms_below_probation:
+                        lifespan_cycles = 1
+                    else:
+                        lifespan_cycles = standard_lifespan
 
-                active_vms.append(vmSimulator(resource_id=resource_id,
-                                              hostname='test_' + str(next_hostname_id),
-                                              admin_tenant_id=TENANT_ID,
-                                              tenant_id=random.choice(vm_tenant_ids),
-                                              region=REGION,
-                                              created_timestamp=timestamp,
-                                              lifespan_cycles=lifespan_cycles,
-                                              seconds_per_cycle=seconds_per_cycle))
-                next_hostname_id += 1
+                    active_vms.append(vmSimulator(resource_id=resource_id,
+                                                  hostname='test_' + str(next_hostname_id),
+                                                  admin_tenant_id=TENANT_ID,
+                                                  tenant_id=random.choice(vm_tenant_ids),
+                                                  region=REGION,
+                                                  created_timestamp=timestamp,
+                                                  lifespan_cycles=lifespan_cycles,
+                                                  seconds_per_cycle=seconds_per_cycle))
+                    next_hostname_id += 1
 
-            global measurement_process_id
-            global total_num_meas
-            print "add measurement batch for process id = {}".format(measurement_process_id)
-            measurement_process_pool.apply_async(add_measurement_batch,
-                                                 args=(active_vms,
-                                                       MEASUREMENTS_FILENAME +
-                                                       str(measurement_process_id,)))
-            measurement_process_id += 1
+                global measurement_process_id
+                global total_num_meas
+                print "add measurement batch for process id = {}".format(measurement_process_id)
+                measurement_process_pool.apply_async(add_measurement_batch,
+                                                     args=(active_vms,
+                                                           MEASUREMENTS_FILENAME +
+                                                           str(measurement_process_id,)))
+                measurement_process_id += 1
 
     print("Waiting for measurement process pool to close")
     measurement_process_pool.close()

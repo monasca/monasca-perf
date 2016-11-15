@@ -21,4 +21,4 @@ def parse_data(path):
     print "results = {}".format(results)
     print "sum_result = {}".format(sum_result)
 
-parse_data('/home/blank/influxdb_repo/test_scripts/data.txt')
+parse_data('/home/blank/python_repos/monasca-perf/influxdb_perf/data.txt')

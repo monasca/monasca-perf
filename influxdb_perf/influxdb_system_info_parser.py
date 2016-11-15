@@ -181,4 +181,4 @@ def parallel_parse(data_path):
     generate_report(data)
 
 
-parallel_parse('/home/blank/influxdb_repo/test_scripts')
+parallel_parse('/home/blank/python_repos/monasca-perf/influxdb_perf/')

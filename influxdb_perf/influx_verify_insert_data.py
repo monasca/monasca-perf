@@ -2,7 +2,7 @@ import argparse
 
 from influxdb import InfluxDBClient
 
-NUMBER_OF_UNIQUE_METRICS = 1000
+NUMBER_OF_UNIQUE_METRICS = 5000
 
 
 def main(host='localhost', port=8086, metric_name='KS', num_clients=4):
