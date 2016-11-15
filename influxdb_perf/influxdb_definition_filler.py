@@ -378,25 +378,28 @@ class vmSimulator(object):
 
         return result
 
-    def create_measurements(self):
-        if self.current_cycle >= self.lifespan_cycles:
-            return []
+    def create_measurements(self, idx):
+        # print "idx = {}, lc = {}".format(idx, self.lifespan_cycles)
+        if idx >= self.lifespan_cycles:
+            return [], idx
 
         meas_list = []
-        for metric_id in self.get_metric_ids(self.current_cycle):
+        for metric_id in self.get_metric_ids(idx):
             value = str(random.randint(0, 1000000))
             if len(metric_id) == 13:
                 meas_list.append('{},cloud_name={},cluster={},service={},resource_id={},zone={},component={},hostname={},lifespan={},device={} value={},metric_id="{}",tenant_id="{}",region="{}"'.format(
                     metric_id[1], metric_id[4], metric_id[5], metric_id[6], metric_id[7], metric_id[8],
-                    metric_id[9], metric_id[10], metric_id[11], metric_id[12], value, metric_id[0], metric_id[2],
-                    metric_id[3]))
+                    metric_id[9], metric_id[10], metric_id[11], metric_id[12], value, metric_id[0],
+                    metric_id[2], metric_id[3]))
             else:
                 meas_list.append('{},cloud_name={},cluster={},service={},resource_id={},zone={},component={},hostname={},lifespan={} value={},metric_id="{}",tenant_id="{}",region="{}"'.format(
                     metric_id[1], metric_id[4], metric_id[5], metric_id[6], metric_id[7], metric_id[8],
                     metric_id[9], metric_id[10], metric_id[11], value, metric_id[0], metric_id[2],
                     metric_id[3]))
+        idx += 1
+        # print "idx = {}".format(idx)
         self.current_cycle += 1
-        return meas_list
+        return meas_list, idx
 
     @staticmethod
     def get_total_metric_defs():
@@ -407,16 +410,6 @@ class vmSimulator(object):
         vswitch_defs = len(vmSimulator.vswitch_metric_names) * len(vmSimulator.vswitches)
 
         return base_defs + disk_agg_defs + disk_defs + network_defs + vswitch_defs
-
-
-def add_measurement_batch(vm_list, filename=MEASUREMENTS_FILENAME):
-    new_measurements = []
-    for vm in vm_list:
-        new_measurements.extend(vm.create_measurements())
-        if len(new_measurements) >= 5000:
-            flush_measurement_data(new_measurements, filename)
-            new_measurements = []
-    flush_measurement_data(new_measurements, filename)
 
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
@@ -511,15 +504,18 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
                                               lifespan_cycles=lifespan_cycles,
                                               seconds_per_cycle=seconds_per_cycle))
                 next_hostname_id += 1
-
-                global measurement_process_id
-                global total_num_meas
-                print "add measurement batch for process id = {}".format(measurement_process_id)
-                measurement_process_pool.apply_async(add_measurement_batch,
-                                                     args=(active_vms,
-                                                           MEASUREMENTS_FILENAME +
-                                                           str(measurement_process_id,)))
-                measurement_process_id += 1
+            global measurement_process_id
+            new_measurements = []
+            idx = 0
+            for vm in active_vms:
+                # print "idx = {}".format(idx)
+                meas, idx = vm.create_measurements(idx)
+                new_measurements.extend(meas)
+                if len(new_measurements) >= 5000:
+                    flush_measurement_data(new_measurements, MEASUREMENTS_FILENAME)
+                    new_measurements = []
+            flush_measurement_data(new_measurements, MEASUREMENTS_FILENAME)
+            measurement_process_id += 1
 
     print("Waiting for measurement process pool to close")
     measurement_process_pool.close()
