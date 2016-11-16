@@ -22,10 +22,10 @@ from influxdb import InfluxDBClient
 FULL_MEASUREMENTS = False
 
 # Total vms active at one time
-TOTAL_ACTIVE_VMS = 800
+TOTAL_ACTIVE_VMS = 20 #800
 
 # Number of new vms per hour.
-NEW_VMS_PER_HOUR = 80
+NEW_VMS_PER_HOUR = 10 # 80
 
 # Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
 VMS_BELOW_PROBATION = 0
@@ -34,7 +34,7 @@ VMS_BELOW_PROBATION = 0
 BASE_TIMESTAMP = datetime.datetime.utcnow() - datetime.timedelta(days=45)
 # BASE_TIMESTAMP = datetime.datetime.strptime("2016-01-01T00:00:00")
 # number of days to fill
-DAYS_TO_FILL = 4
+DAYS_TO_FILL = 1
 
 CONN_INFO = {'user': 'dbadmin',
              'password': 'password'
@@ -43,11 +43,14 @@ CONN_INFO = {'user': 'dbadmin',
 # Tenant id to report metrics under
 TENANT_ID = "98737d81752f4ebcba8e576a05dc487b"
 # Region in which to report metrics
-REGION = "Region 1"
+REGION = "Region_1"
 
 # Database name for influx client
 DATABASE_NAME = 'monasca'
 
+client = InfluxDBClient('localhost', 8086, 'admin', 'my_password', DATABASE_NAME)
+print "Creating database: {}...".format(DATABASE_NAME)
+client.create_database(DATABASE_NAME)
 
 # Number of different tenants to create vms under
 TOTAL_VM_TENANTS = 256
@@ -55,33 +58,11 @@ TOTAL_VM_TENANTS = 256
 # number of definitions to store in memory before writing to vertica
 LOCAL_STORAGE_MAX = 5000
 
+MEASUREMENTS_FILENAME = '/tmp/meas.txt'
 
-# DEF_DIMS_FILENAME = '/tmp/defdims.dat'
-#
-# DEFINITIONS_FILENAME = '/tmp/definitions.dat'
-#
-# DIMENSIIONS_FILENAME = '/tmp/dimensions.dat'
-#
-# MEASUREMENTS_FILENAME = '/tmp/measurements.dat'
-#
-# DEFINITION_COPY_QUERY = "COPY MonMetrics.DefinitionDimensions(id,definition_id,dimension_set_id) FROM '{}' " \
-#                         "DELIMITER ',' DIRECT COMMIT; " \
-#                         "COPY MonMetrics.Definitions(id,name,tenant_id,region) FROM '{}' " \
-#                         "DELIMITER ',' DIRECT COMMIT; " \
-#                         "COPY MonMetrics.Dimensions(dimension_set_id,name,value) FROM '{}' " \
-#                         "DELIMITER ',' DIRECT COMMIT; "
-# MEASUREMENT_COPY_QUERY = "COPY MonMetrics.Measurements(definition_dimensions_id,time_stamp,value) FROM '{}' " \
-#                          "DELIMITER ',' DIRECT COMMIT; "
-
-# def_id_set = set()
-# dim_id_set = set()
-# def_dim_id_set = set()
-# def_list = []
-# dims_list = []
-# def_dims_list = []
 
 measurement_process_id = 0
-total_measurement_processes = 5
+total_measurement_processes = 2
 
 next_hostname_id = 1
 # measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
@@ -90,8 +71,8 @@ ID_SIZE = 20
 
 
 class vmSimulator(object):
-    disks = ['sda', 'sdb', 'sdc']
-    vswitches = ['vs1', 'vs2', 'vs3']
+    disks = ['sda'] #, 'sdb', 'sdc']
+    vswitches = ['vs1'] #, 'vs2', 'vs3']
     network_devices = ['tap1']
     metric_names = ["cpu.time_ns",
                     "cpu.utilization_norm_perc",
@@ -173,8 +154,6 @@ class vmSimulator(object):
                          "vm.io.write_ops_sec"]
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
-                            # "vm.vswitch.in_bits",
-                            # "vm.vswitch.in_bits_sec",
                             "vm.vswitch.in_packets",
                             "vm.vswitch.in_packets_sec",
                             "vm.vswitch.in_dropped",
@@ -183,8 +162,6 @@ class vmSimulator(object):
                             "vm.vswitch.in_errors_sec",
                             "vm.vswitch.out_bytes",
                             "vm.vswitch.out_bytes_sec",
-                            # "vm.vswitch.out_bits",
-                            # "vm.vswitch.out_bits_sec",
                             "vm.vswitch.out_packets",
                             "vm.vswitch.out_packets_sec",
                             "vm.vswitch.out_dropped",
@@ -193,8 +170,6 @@ class vmSimulator(object):
                             "vm.vswitch.out_errors_sec",
                             "vswitch.in_bytes",
                             "vswitch.in_bytes_sec",
-                            # "vswitch.in_bits",
-                            # "vswitch.in_bits_sec",
                             "vswitch.in_packets",
                             "vswitch.in_packets_sec",
                             "vswitch.in_dropped",
@@ -203,8 +178,6 @@ class vmSimulator(object):
                             "vswitch.in_errors_sec",
                             "vswitch.out_bytes",
                             "vswitch.out_bytes_sec",
-                            # "vswitch.out_bits",
-                            # "vswitch.out_bits_sec",
                             "vswitch.out_packets",
                             "vswitch.out_packets_sec",
                             "vswitch.out_dropped",
@@ -369,15 +342,15 @@ class vmSimulator(object):
         if self.current_cycle >= self.lifespan_cycles:
             return []
 
-        if timestamp is None:
-            second_delta = self.seconds_per_cycle * self.current_cycle
-            timestamp = self.created_timestamp + datetime.timedelta(seconds=second_delta)
-            timestamp = timestamp.toordinal()
+        # if timestamp is None:
+        #     second_delta = self.seconds_per_cycle * self.current_cycle
+        #     timestamp = self.created_timestamp + datetime.timedelta(seconds=second_delta)
+        #     timestamp = timestamp.toordinal() # * 1000000
 
         meas_list = []
         for metric_id in self.get_metric_ids(self.current_cycle):
-            value = str(random.randint(0, 1000000))
-            meas_list.append(' '.join([metric_id, timestamp, value]))
+            value = str(self.current_cycle)  # str(random.randint(0, 1000000))
+            meas_list.append(' '.join([metric_id, 'value='+str(value)]))  # , str(timestamp
         self.current_cycle += 1
         return meas_list
 
@@ -393,8 +366,9 @@ class vmSimulator(object):
         return base_defs + disk_agg_defs + disk_defs + network_defs + vswitch_defs
 
 
-def add_measurement_batch(active_vms):
-    client = InfluxDBClient('localhost', 8086, 'root', 'root', DATABASE_NAME)
+def add_measurement_batch(active_vms, filename=MEASUREMENTS_FILENAME):
+    client1 = InfluxDBClient('localhost', 8086, 'admin', 'my_password', DATABASE_NAME)
+
     meas_list = []
     while True:
         new_measurements = []
@@ -402,113 +376,21 @@ def add_measurement_batch(active_vms):
             new_measurements.extend(vm.create_measurements())
         if len(new_measurements) <= 0:
             break
+        meas_list.extend(new_measurements)
 
     for i in range(0, len(meas_list), LOCAL_STORAGE_MAX):
         send_list = meas_list[i:i+LOCAL_STORAGE_MAX]
-        client.write_points(send_list, batch_size=len(send_list),
-                            time_precision='ms', protocol='line')
+        time.sleep(1)
+        client1.write_points(send_list, batch_size=len(send_list),
+                             time_precision='ms', protocol='line')
 
 
-# def add_measurement_batch(vm_list, filename=MEASUREMENTS_FILENAME):
-#     meas_list = []
-#     while True:
-#         new_measurements = []
-#         for vm in vm_list:
-#             new_measurements.extend(vm.create_measurements())
-#
-#         if len(new_measurements) == 0:
-#             break
-#         meas_list.extend(new_measurements)
-#
-#     flush_measurement_data(meas_list, filename)
-
-
-def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1',
-                        def_dim_id=None, definition_id=None, dimension_set_id=None):
-    # if definition_id is None:
-    #     id_hash = hashlib.sha1()
-    #     id_hash.update(str(name) + str(tenant_id) + str(region))
-    #     definition_id = id_hash.hexdigest()
-    #
-    # if definition_id not in def_id_set:
-    #     def_list.append(','.join([definition_id, name, tenant_id, region]))
-    #     def_id_set.add(definition_id)
-    #
-    # if dimension_set_id is None:
-    #     id_hash = hashlib.sha1()
-    #     id_hash.update(','.join([str(key) + '=' + str(dimensions[key]) for key in dimensions.keys()]))
-    #     dimension_set_id = id_hash.hexdigest()
-    #
-    # if dimension_set_id not in dim_id_set:
-    #     dims_list.append(get_dimension_set_str(dimensions, dimension_set_id))
-    #     dim_id_set.add(dimension_set_id)
-    #
-    # if def_dim_id is None:
-    #     id_hash = hashlib.sha1()
-    #     id_hash.update(str(definition_id) + str(dimension_set_id))
-    #     def_dim_id = id_hash.hexdigest()
-    #
-    # if def_dim_id not in def_dim_id_set:
-    #     def_dims_list.append(','.join([def_dim_id, definition_id, dimension_set_id]))
-    #     def_dim_id_set.add(def_dim_id)
-
-    def_dim_id = [name, "_tenant_id=" + tenant_id, "_region=" + region]
-    for key, value in dimensions:
+def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1'):
+    def_dim_id = [name, "tenant_id=\"" + tenant_id + "\"", "region=\"" + region + "\""]
+    for key, value in dimensions.iteritems():
         def_dim_id.append(key + "=" + value)
 
     return ','.join(def_dim_id)
-
-
-# def get_dimension_set_str(dimensions, dimension_set_id):
-#     dim_data = []
-#     for key in dimensions.iterkeys():
-#         dim_data.append(','.join([dimension_set_id, key, dimensions[key]]))
-#
-#     return '\n'.join(dim_data)
-#
-#
-# def set_dimension_values(active_dimensions, base_dimensions, day, hour, definition):
-#     for key in base_dimensions.keys():
-#         active_dimensions[key] = base_dimensions[key].format(day=day,
-#                                                              hour=hour,
-#                                                              definition=definition)
-
-
-# def flush_definition_data():
-#     global def_dims_list
-#     def_dims_temp = open(DEF_DIMS_FILENAME, 'w')
-#     def_dims_temp.write('\n'.join(def_dims_list) + '\n')
-#     def_dims_temp.close()
-#     def_dims_list = []
-#
-#     global def_list
-#     def_temp = open(DEFINITIONS_FILENAME, 'w')
-#     def_temp.write('\n'.join(def_list) + '\n')
-#     def_temp.close()
-#     def_list = []
-#
-#     global dims_list
-#     dims_temp = open(DIMENSIIONS_FILENAME, 'w')
-#     dims_temp.write('\n'.join(dims_list) + '\n')
-#     dims_temp.close()
-#     dims_list = []
-#
-#     query = DEFINITION_COPY_QUERY.format(DEF_DIMS_FILENAME,
-#                                          DEFINITIONS_FILENAME,
-#                                          DIMENSIIONS_FILENAME)
-#     run_query(query)
-
-
-# def flush_measurement_data(meas_list, filename):
-#     meas_temp = open(filename, 'w')
-#     meas_temp.write('\n'.join(meas_list) + '\n')
-#     meas_temp.close()
-#
-#     query = MEASUREMENT_COPY_QUERY.format(filename)
-#
-#     run_query(query)
-#
-#     os.remove(filename)
 
 
 def id_generator(size=32, chars=string.hexdigits):
@@ -519,10 +401,6 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
     measurement_process_pool = Pool(total_measurement_processes)
 
     vm_tenant_ids = [id_generator(ID_SIZE) for _ in range(TOTAL_VM_TENANTS)]
-
-    # metrics_per_vm = vmSimulator.get_total_metric_defs()
-    # expected_definitions = (days_to_fill * 24 *
-    #                         (NEW_VMS_PER_HOUR + VMS_BELOW_PROBATION) * metrics_per_vm)
 
     seconds_per_cycle = 30 if FULL_MEASUREMENTS else 3600  # 30 sec or 1 hour
     cycles_per_hour = 3600 / seconds_per_cycle
@@ -561,66 +439,26 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
 
             global measurement_process_id
             measurement_process_pool.apply_async(add_measurement_batch,
-                                                 args=active_vms)
-            # MEASUREMENTS_FILENAME + str(measurement_process_id,)))
-            measurement_process_id += 1
+                                                 args=(active_vms,
+                                                       MEASUREMENTS_FILENAME +
+                                                       str(measurement_process_id,)))
 
-            # submit definitions in batches to avoid
-            # using lots of memory and making long queries
-    #         if len(def_dims_list) > LOCAL_STORAGE_MAX:
-    #             print("Flushing Definitions")
-    #             # flush_definition_data()
-    #             delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
-    #             print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
-    #
-    # # insert any remaining definitions
-    # if len(def_dims_list) > 0:
-    #     print("Flushing Definitions")
-    #     # flush_definition_data()
-    #     delta_def_dim_ids = len(def_dim_id_set) - initial_id_set_size
-    #     print("{0:.2f} %".format(delta_def_dim_ids / float(expected_definitions) * 100))
+            print "job_id = {}".format(measurement_process_id)
+            measurement_process_id += 1
 
     print("Waiting for measurement process pool to close")
     measurement_process_pool.close()
     measurement_process_pool.join()
 
     total_time_delta = time.time() - start_time
-    print("total time: " + total_time_delta + " sec")
-    # print("Loaded {0} definitions in {1:.2f} secs".format(len(def_dim_id_set), total_time_delta))
-    # print("{0:.0f} def/sec\n".format(len(def_dim_id_set) / total_time_delta))
+    print("total time: " + str(total_time_delta) + " sec")
 
 
-# def run_query(query):
-#     command = ["/opt/vertica/bin/vsql",
-#                "-U" + CONN_INFO['user'],
-#                "-w" + CONN_INFO['password'],
-#                "-c", query]
-#
-#     sub_output = subprocess.check_output(command)
-#     return [line.strip() for line in sub_output.splitlines()[2:-2]]
-
-
-def vertica_db_filler():
-    # if CLEAR_METRICS:
-    #     print("Removing all vertica data")
-    #     query = "TRUNCATE TABLE MonMetrics.DefinitionDimensions; " \
-    #             "TRUNCATE TABLE MonMetrics.Definitions; " \
-    #             "TRUNCATE TABLE MonMetrics.Dimensions; " \
-    #             "TRUNCATE TABLE MonMetrics.Measurements;"
-    #     run_query(query)
+def influx_db_filler():
     print("Creating metric history for {} days".format(DAYS_TO_FILL))
     fill_metrics(BASE_TIMESTAMP, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
-
-    # print("Checking if data arrived...")
-    # print("DefinitionDimensions")
-    # results = run_query("SELECT count(*) FROM MonMetrics.DefinitionDimensions;")
-    # print('\n'.join(results))
-    # print("Measurements")
-    # results = run_query("SELECT count(*) FROM MonMetrics.Measurements;")
-    # print('\n'.join(results))
-
-    print('Finished loading VDB')
+    print('Finished loading InfluxDB')
 
 
 if __name__ == "__main__":
-    sys.exit(vertica_db_filler())
+    sys.exit(influx_db_filler())
