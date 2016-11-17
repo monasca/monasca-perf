@@ -1,12 +1,13 @@
 import argparse
+import datetime
 import hashlib
 import os
 import subprocess
+import time
 import uuid
 
 from collections import defaultdict
 from influxdb import InfluxDBClient
-from datetime import datetime
 
 NUMBER_OF_MEASUREMENTS = 2000000
 NUMBER_PER_BATCH = 5000
@@ -49,7 +50,7 @@ def main(host='localhost', port=8086, client_num=1):
 
     # INSERT
     print "Write points: batch_size = {0}".format(NUMBER_PER_BATCH)
-    start_time = datetime.utcnow()
+    start_time = datetime.datetime.utcnow()
     print "Start time: {0}".format(start_time)
 
     dimension_keys_values_map = {'service': 'monitoring', 'host': 'localhost',
@@ -59,10 +60,16 @@ def main(host='localhost', port=8086, client_num=1):
 
     metric_count = 0
     metric_name_dict = defaultdict(int)
-    for i in xrange(NUMBER_OF_MEASUREMENTS / NUMBER_PER_BATCH):
+    base_timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=45)
+    base_datetime = time.mktime(base_timestamp.timetuple())
+
+    for i in xrange(NUMBER_OF_MEASUREMENTS / NUMBER_PER_BATCH): # 400
         batch_set = []
-        for j in xrange(NUMBER_PER_BATCH):
-            # make sure in each batch, all the measurements have different metric name
+        for j in xrange(NUMBER_PER_BATCH): # 5000
+            # make sure in each batch,
+            # all the measurements have different metric name and timestamp
+            timestamp = str(int(base_datetime * 1000 + i * NUMBER_PER_BATCH
+                                + j))
             metric_name = 'metric_KS_{0}_{1}'.format(client_num, j)
             metric_name_dict[metric_name] += 1
             value = i * NUMBER_PER_BATCH + j
@@ -76,12 +83,15 @@ def main(host='localhost', port=8086, client_num=1):
             line_body = '{0},zone=nova,service=compute,resource_id=34c0ce14-9ce4-4d3d-84a4-172e1ddb26c4,' \
                         'tenant_id=71fea2331bae4d98bb08df071169806d,hostname={1},component=vm,' \
                         'control_plane=ccp,cluster=compute,cloud_name=monasca value={2},' \
-                        'metric_id="{3}"'.format(metric_name, host_name, value, str(metric_id))
+                        'metric_id="{3}" {4}'.format(metric_name, host_name,
+                                                     value, str(metric_id),
+                                                     timestamp)
+            print "line_body = {}".format(line_body)
             batch_set.append(line_body)
             metric_count += 1
         client.write_points(batch_set, batch_size=NUMBER_PER_BATCH,
                             time_precision='ms', protocol='line')
-    end_time = datetime.utcnow()
+    end_time = datetime.datetime.utcnow()
     elapsed = end_time - start_time
     if running_recording:
         os.kill(top_process.pid, 9)
