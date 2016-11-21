@@ -1,5 +1,5 @@
 import datetime
-from multiprocessing import Pool
+import gc
 import random
 import string
 import sys
@@ -7,6 +7,8 @@ import time
 import uuid
 
 from influxdb import InfluxDBClient
+from multiprocessing import Pool
+# from memory_profiler import profile
 
 """ vertica_definition_filler
     This will simulate a number of days worth of metric definition history.
@@ -21,10 +23,12 @@ FULL_MEASUREMENTS = True
 DAYS_TO_FILL = 1
 
 # Total vms active at one time
-TOTAL_ACTIVE_VMS = 800
+TOTAL_ACTIVE_VMS = 100
 
 # Number of new vms per hour.
-NEW_VMS_PER_HOUR = 80
+NEW_VMS_PER_HOUR = 10
+
+total_measurement_processes = 12
 
 # Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
 VMS_BELOW_PROBATION = 0
@@ -45,8 +49,9 @@ REGION = "Region_1"
 DATABASE_NAME = 'monasca'
 
 client = InfluxDBClient('localhost', 8086, 'admin', 'my_password', DATABASE_NAME)
-print "Creating database: {}...".format(DATABASE_NAME)
-client.create_database(DATABASE_NAME)
+if DATABASE_NAME not in client.get_list_database():
+    print "Creating database: {}...".format(DATABASE_NAME)
+    client.create_database(DATABASE_NAME)
 
 # Number of different tenants to create vms under
 TOTAL_VM_TENANTS = 256
@@ -54,7 +59,6 @@ TOTAL_VM_TENANTS = 256
 MEASUREMENTS_FILENAME = '/tmp/measurements.txt'
 
 measurement_process_id = 0
-total_measurement_processes = 12
 
 next_hostname_id = 1
 # measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
@@ -354,17 +358,6 @@ class vmSimulator(object):
         return meas_list
 
 
-    @staticmethod
-    def get_total_metric_defs():
-        base_defs = len(vmSimulator.metric_names)
-        disk_agg_defs = len(vmSimulator.disk_agg_metric_names)
-        disk_defs = len(vmSimulator.disk_metric_names) * len(vmSimulator.disks)
-        network_defs = len(vmSimulator.network_metric_names) * len(vmSimulator.network_devices)
-        vswitch_defs = len(vmSimulator.vswitch_metric_names) * len(vmSimulator.vswitches)
-
-        return base_defs + disk_agg_defs + disk_defs + network_defs + vswitch_defs
-
-
 def add_measurement_batch(active_vms, filename=MEASUREMENTS_FILENAME):
     client1 = InfluxDBClient('localhost', 8086, 'admin', 'my_password', DATABASE_NAME)
 
@@ -434,7 +427,6 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
                                                        str(measurement_process_id,)))
 
             measurement_process_id += 1
-        print "Finishing day {}...".format(x)
 
     print("Waiting for measurement process pool to close")
     measurement_process_pool.close()
