@@ -1,20 +1,17 @@
 import datetime
+import gc
 import random
+import requests
 import string
 import sys
 import time
 import uuid
 
-from influxdb import InfluxDBClient
 from multiprocessing import Pool
-from memory_profiler import profile
 
 """ vertica_definition_filler
     This will simulate a number of days worth of metric definition history.
 """
-
-# Clear the current metrics from the DB for testing
-# CLEAR_METRICS = True
 
 # Add metrics every 30 seconds for the full measurement load (false, send only one metric per hour)
 FULL_MEASUREMENTS = True
@@ -22,13 +19,16 @@ FULL_MEASUREMENTS = True
 DAYS_TO_FILL = 1
 
 # Total vms active at one time
-TOTAL_ACTIVE_VMS = 10
+TOTAL_ACTIVE_VMS = 1000
 
 # Number of new vms per hour.
-NEW_VMS_PER_HOUR = 1
+NEW_VMS_PER_HOUR = 100
 
-total_measurement_processes = 4
+total_measurement_processes = 5
 
+BATCH_SIZE = 5000
+
+NUMBER_OF_HOURS_PER_DAY = 24
 # Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
 VMS_BELOW_PROBATION = 0
 
@@ -47,10 +47,9 @@ REGION = "Region_1"
 # Database name for influx client
 DATABASE_NAME = 'monasca'
 
-client = InfluxDBClient('localhost', 8086, 'admin', 'my_password', DATABASE_NAME)
-if DATABASE_NAME not in client.get_list_database():
-    print "Creating database: {}...".format(DATABASE_NAME)
-    client.create_database(DATABASE_NAME)
+url = 'http://localhost:8086/query'
+param = 'q=CREATE DATABASE monasca'
+requests.get(url=url, params=param)
 
 # Number of different tenants to create vms under
 TOTAL_VM_TENANTS = 256
@@ -60,18 +59,16 @@ MEASUREMENTS_FILENAME = '/tmp/measurements.txt'
 measurement_process_id = 0
 
 next_hostname_id = 1
-# measurements_per_hour = 120 if FULL_MEASUREMENTS else 1
 
 ID_SIZE = 20
 
 
 class vmSimulator(object):
-    disks = ['sda', 'sdb', 'sdc']
+    disks = ['sda', 'sdb', 'sdc', 'sdd']
     vswitches = ['vs1', 'vs2', 'vs3']
-    network_devices = ['tap1']
-    # 126 with 1 disk 1 vswitch 1 network device
-    # 242 with 3 disk 3 vswitch 1 network device
-    # 24
+    network_devices = ['tap1', 'tap2']
+    # 420 with 4 disk 3 vswitch 2 network device
+    # 62
     metric_names = ["cpu.time_ns",
                     "cpu.utilization_norm_perc",
                     "cpu.utilization_perc",
@@ -95,8 +92,59 @@ class vmSimulator(object):
                     "vm.mem.swap_used_mb",
                     "vm.mem.total_mb",
                     "vm.mem.used_mb",
-                    "vm.ping_status"]
-    # 26 * 3 = 78
+                    "vm.ping_status",
+                    "cpu.frequency_mhz",
+                    "cpu.idle_perc",
+                    "cpu.idle_time",
+                    "cpu.percent",
+                    "cpu.stolen_perc",
+                    "cpu.system_perc",
+                    "cpu.system_time",
+                    "cpu.total_logical_cores",
+                    "cpu.user_perc",
+                    "cpu.user_time",
+                    "cpu.wait_perc",
+                    "cpu.wait_time",
+                    "mem.swap_free_mb",
+                    "mem.swap_free_perc",
+                    "mem.swap_total_mb",
+                    "mem.usable_mb",
+                    "mem.usable_perc",
+                    "mem.used_buffers",
+                    "mem.used_cache",
+                    "vm.cpu.frequency_mhz",
+                    "vm.cpu.idle_perc",
+                    "vm.cpu.idle_time",
+                    "vm.cpu.percent",
+                    "vm.cpu.stolen_perc",
+                    "vm.cpu.system_perc",
+                    "vm.cpu.system_time",
+                    "vm.cpu.total_logical_cores",
+                    "vm.cpu.user_perc",
+                    "vm.cpu.user_time",
+                    "vm.cpu.wait_perc",
+                    "vm.cpu.wait_time",
+                    "vm.mem.swap_free_mb",
+                    "vm.mem.swap_free_perc",
+                    "vm.mem.swap_total_mb",
+                    "vm.mem.usable_mb",
+                    "vm.mem.usable_perc",
+                    "vm.mem.used_buffers",
+                    "vm.mem.used_cache"]
+    # 12
+    process_metric_names = ["process.cpu_perc",
+                            "process.io.read_count",
+                            "process.io.read_kbytes",
+                            "process.io.write_count",
+                            "process.io.write_kbytes",
+                            "process.mem.rss_mbytes",
+                            "process.open_file_descriptors",
+                            "process.pid_count",
+                            "process.thread_count",
+                            "load.avg_15_min",
+                            "load.avg_1_min",
+                            "load.avg_5_min"]
+    # 26
     disk_agg_metric_names = ["disk.allocation_total",
                              "disk.capacity_total",
                              "disk.physical_total",
@@ -123,7 +171,7 @@ class vmSimulator(object):
                              "vm.io.write_bytes_total_sec",
                              "vm.io.write_ops_total",
                              "vm.io.write_ops_total_sec"]
-    # 28
+    # 48 * 4 = 192
     disk_metric_names = ["disk.allocation",
                          "disk.capacity",
                          "disk.ephemeral.size",
@@ -151,7 +199,27 @@ class vmSimulator(object):
                          "vm.io.write_bytes",
                          "vm.io.write_bytes_sec",
                          "vm.io.write_ops",
-                         "vm.io.write_ops_sec"]
+                         "vm.io.write_ops_sec",
+                         "disk.inode_used_perc",
+                         "disk.space_used_perc",
+                         "disk.total_space_mb",
+                         "disk.total_used_space_mb",
+                         "io.read_kbytes_sec",
+                         "io.read_req_sec",
+                         "io.read_time_sec",
+                         "io.write_kbytes_sec",
+                         "io.write_req_sec",
+                         "io.write_time_sec",
+                         "vm.disk.inode_used_perc",
+                         "vm.disk.space_used_perc",
+                         "vm.disk.total_space_mb",
+                         "vm.disk.total_used_space_mb",
+                         "vm.io.read_kbytes_sec",
+                         "vm.io.read_req_sec",
+                         "vm.io.read_time_sec",
+                         "vm.io.write_kbytes_sec",
+                         "vm.io.write_req_sec",
+                         "vm.io.write_time_sec"]
     # 32 * 3 = 96
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
@@ -185,7 +253,7 @@ class vmSimulator(object):
                             "vswitch.out_dropped_sec",
                             "vswitch.out_errors",
                             "vswitch.out_errors_sec"]
-    # 16
+    # 16*2=32
     network_metric_names = ["net.in_bytes",
                             "net.in_bytes_sec",
                             "net.in_packets",
@@ -245,6 +313,20 @@ class vmSimulator(object):
 
     def preload_metrics(self):
         for name in vmSimulator.metric_names:
+            dimensions = self.base_dimensions.copy()
+            tenant_id = self.vm_tenant_id
+
+            if name.startswith('vm.'):
+                dimensions['tenant_id'] = self.vm_tenant_id
+                tenant_id = self.admin_tenant_id
+
+            metric_id = add_full_definition(name=name,
+                                            dimensions=dimensions,
+                                            tenant_id=tenant_id,
+                                            region=REGION)
+            self.metric_ids.add(metric_id)
+
+        for name in vmSimulator.process_metric_names:
             dimensions = self.base_dimensions.copy()
             tenant_id = self.vm_tenant_id
 
@@ -358,8 +440,6 @@ class vmSimulator(object):
 
 
 def add_measurement_batch(active_vms, filename=MEASUREMENTS_FILENAME):
-    client1 = InfluxDBClient('localhost', 8086, 'admin', 'my_password', DATABASE_NAME)
-
     meas_list = []
     while True:
         new_measurements = []
@@ -368,7 +448,12 @@ def add_measurement_batch(active_vms, filename=MEASUREMENTS_FILENAME):
         if len(new_measurements) <= 0:
             break
         meas_list.extend(new_measurements)
-    client1.write_points(meas_list, batch_size=5000, time_precision='ms', protocol='line')
+
+    for i in range(0, len(meas_list), BATCH_SIZE):
+        batch_list = meas_list[i:i+BATCH_SIZE]
+        line_protocol = '\n'.join(batch_list)
+        write_url = 'http://localhost:8086/write?db=monasca'
+        requests.post(write_url, data=line_protocol)
 
 
 def add_full_definition(name, dimensions, tenant_id='tenant_1', region='region_1'):
@@ -383,7 +468,6 @@ def id_generator(size=32, chars=string.hexdigits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
-@profile
 def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_probation):
     measurement_process_pool = Pool(total_measurement_processes)
 
@@ -398,7 +482,7 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
 
     start_time = time.time()
     for x in xrange(days_to_fill):
-        for y in xrange(24):
+        for y in xrange(NUMBER_OF_HOURS_PER_DAY):
             timestamp = base_timestamp + datetime.timedelta(days=x, hours=y)
             active_vms = []
             for z in xrange(new_vms_per_hour + vms_below_probation):
@@ -419,13 +503,11 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
                                               lifespan_cycles=lifespan_cycles,
                                               seconds_per_cycle=seconds_per_cycle))
                 next_hostname_id += 1
-
             global measurement_process_id
             measurement_process_pool.apply_async(add_measurement_batch,
                                                  args=(active_vms,
                                                        MEASUREMENTS_FILENAME +
                                                        str(measurement_process_id,)))
-
             measurement_process_id += 1
 
     print("Waiting for measurement process pool to close")
@@ -437,9 +519,11 @@ def fill_metrics(base_timestamp, days_to_fill, new_vms_per_hour, vms_below_proba
 
 
 def influx_db_filler():
+    collected = gc.collect()
     print("Creating metric history for {} days".format(DAYS_TO_FILL))
     fill_metrics(BASE_TIMESTAMP, DAYS_TO_FILL, NEW_VMS_PER_HOUR, VMS_BELOW_PROBATION)
     print('Finished loading InfluxDB')
+    print "collected = {}".format(collected)
 
 
 if __name__ == "__main__":
