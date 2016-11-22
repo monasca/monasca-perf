@@ -19,13 +19,14 @@ def main():
     r, delta_time = run_query(query)
     status_output(r, delta_time)
 
-    # print("\nMetric-list | Name and start time")
-    # query = 'q=SHOW SERIES FROM "io.write_bytes_total_sec" where time >= 1476085793030'
-    # r, delta_time = run_query(query)
-    # status_output(r, delta_time)
+    print("\nMetric-list | Name and start time")
+    query = 'q=SELECT * FROM "io.write_bytes_total_sec" where time >= 1476085793030 limit 1'
+    r, delta_time = run_query(query)
+    status_output(r, delta_time)
 
     print("\nMetric-list | Name and max dimensions (single result)")
-    query = 'q=SHOW SERIES FROM "io.write_bytes_total_sec" WHERE resource_id=\'a17d0d28-0c3e-48d5-9554-9ae86a788229\''
+    query = 'q=SHOW SERIES FROM "io.write_bytes_total_sec" WHERE ' \
+            'resource_id=\'a17d0d28-0c3e-48d5-9554-9ae86a788229\''
     r, delta_time = run_query(query)
     status_output(r, delta_time)
 
@@ -52,17 +53,21 @@ def main():
     r, delta_time = run_query(query)
     status_output(r, delta_time)
 
-    # print("\nMeasurement-list | Name only merged (non-vm metric)")
-    # query = 'q=SELECT * FROM "cpu.idle_perc" where time >= 1476085793030 merge resource_id'
-    # r, delta_time = run_query(query)
-    # status_output(r, delta_time)
+    print("\nMeasurement-list | Name only merged (non-vm metric)")
+    query = 'q=SELECT * FROM "cpu.idle_perc" where time >= 1476085793030'
+    r, delta_time = run_query(query)
+    status_output(r, delta_time)
 
     print("\nMeasurement-list | Name only grouped (non-vm metric)")
     query = 'q=SELECT * FROM "cpu.idle_perc" where time >= 1476085793030 group by *'
     r, delta_time = run_query(query)
     status_output(r, delta_time)
 
-    # print("\nMeasurement-list | Name only merged (vm metric)")
+    print("\nMeasurement-list | Name only merged (vm metric)")
+    query = 'q=SELECT * FROM "vm.mem.used_mb" where time >= 1476085793030'
+    r, delta_time = run_query(query)
+    status_output(r, delta_time)
+
     print("\nMeasurement-list | Name only grouped (vm metric)")
     query = 'q=SELECT * FROM "vm.mem.used_mb" where time >= 1476085793030 group by *'
     r, delta_time = run_query(query)
