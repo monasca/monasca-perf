@@ -1,5 +1,4 @@
 import datetime
-import gc
 import random
 import string
 import sys
@@ -8,7 +7,6 @@ import uuid
 
 from influxdb import InfluxDBClient
 from multiprocessing import Pool
-# from memory_profiler import profile
 
 """ vertica_definition_filler
     This will simulate a number of days worth of metric definition history.
@@ -28,7 +26,7 @@ TOTAL_ACTIVE_VMS = 100
 # Number of new vms per hour.
 NEW_VMS_PER_HOUR = 10
 
-total_measurement_processes = 12
+total_measurement_processes = 5
 
 # Number of VMs less than probation time per hour (i.e. remove new vms after a single report)
 VMS_BELOW_PROBATION = 0
