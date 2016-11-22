@@ -255,20 +255,6 @@ class vmSimulator(object):
                                             region=REGION)
             self.metric_ids.add(metric_id)
 
-        for name in vmSimulator.process_metric_names:
-            dimensions = self.base_dimensions.copy()
-            tenant_id = self.vm_tenant_id
-
-            if name.startswith('vm.'):
-                dimensions['tenant_id'] = self.vm_tenant_id
-                tenant_id = self.admin_tenant_id
-
-            metric_id = add_full_definition(name=name,
-                                            dimensions=dimensions,
-                                            tenant_id=tenant_id,
-                                            region=REGION)
-            self.metric_ids.add(metric_id)
-
         for name in vmSimulator.disk_agg_metric_names:
             dimensions = self.base_dimensions.copy()
             tenant_id = self.vm_tenant_id
