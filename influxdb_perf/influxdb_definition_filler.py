@@ -19,10 +19,10 @@ FULL_MEASUREMENTS = True
 DAYS_TO_FILL = 1
 
 # Total vms active at one time
-TOTAL_ACTIVE_VMS = 1000
+TOTAL_ACTIVE_VMS = 8000
 
 # Number of new vms per hour.
-NEW_VMS_PER_HOUR = 100
+NEW_VMS_PER_HOUR = 800
 
 total_measurement_processes = 5
 
@@ -64,11 +64,11 @@ ID_SIZE = 20
 
 
 class vmSimulator(object):
-    disks = ['sda', 'sdb', 'sdc', 'sdd']
+    disks = ['sda', 'sdb', 'sdc']
     vswitches = ['vs1', 'vs2', 'vs3']
-    network_devices = ['tap1', 'tap2']
-    # 420 with 4 disk 3 vswitch 2 network device
-    # 62
+    network_devices = ['tap1']
+    # 246 with 3 disk 3 vswitch 1 network device
+    # 24
     metric_names = ["cpu.time_ns",
                     "cpu.utilization_norm_perc",
                     "cpu.utilization_perc",
@@ -92,58 +92,7 @@ class vmSimulator(object):
                     "vm.mem.swap_used_mb",
                     "vm.mem.total_mb",
                     "vm.mem.used_mb",
-                    "vm.ping_status",
-                    "cpu.frequency_mhz",
-                    "cpu.idle_perc",
-                    "cpu.idle_time",
-                    "cpu.percent",
-                    "cpu.stolen_perc",
-                    "cpu.system_perc",
-                    "cpu.system_time",
-                    "cpu.total_logical_cores",
-                    "cpu.user_perc",
-                    "cpu.user_time",
-                    "cpu.wait_perc",
-                    "cpu.wait_time",
-                    "mem.swap_free_mb",
-                    "mem.swap_free_perc",
-                    "mem.swap_total_mb",
-                    "mem.usable_mb",
-                    "mem.usable_perc",
-                    "mem.used_buffers",
-                    "mem.used_cache",
-                    "vm.cpu.frequency_mhz",
-                    "vm.cpu.idle_perc",
-                    "vm.cpu.idle_time",
-                    "vm.cpu.percent",
-                    "vm.cpu.stolen_perc",
-                    "vm.cpu.system_perc",
-                    "vm.cpu.system_time",
-                    "vm.cpu.total_logical_cores",
-                    "vm.cpu.user_perc",
-                    "vm.cpu.user_time",
-                    "vm.cpu.wait_perc",
-                    "vm.cpu.wait_time",
-                    "vm.mem.swap_free_mb",
-                    "vm.mem.swap_free_perc",
-                    "vm.mem.swap_total_mb",
-                    "vm.mem.usable_mb",
-                    "vm.mem.usable_perc",
-                    "vm.mem.used_buffers",
-                    "vm.mem.used_cache"]
-    # 12
-    process_metric_names = ["process.cpu_perc",
-                            "process.io.read_count",
-                            "process.io.read_kbytes",
-                            "process.io.write_count",
-                            "process.io.write_kbytes",
-                            "process.mem.rss_mbytes",
-                            "process.open_file_descriptors",
-                            "process.pid_count",
-                            "process.thread_count",
-                            "load.avg_15_min",
-                            "load.avg_1_min",
-                            "load.avg_5_min"]
+                    "vm.ping_status"]
     # 26
     disk_agg_metric_names = ["disk.allocation_total",
                              "disk.capacity_total",
@@ -171,7 +120,7 @@ class vmSimulator(object):
                              "vm.io.write_bytes_total_sec",
                              "vm.io.write_ops_total",
                              "vm.io.write_ops_total_sec"]
-    # 48 * 4 = 192
+    # 28 * 3 = 84
     disk_metric_names = ["disk.allocation",
                          "disk.capacity",
                          "disk.ephemeral.size",
@@ -199,27 +148,7 @@ class vmSimulator(object):
                          "vm.io.write_bytes",
                          "vm.io.write_bytes_sec",
                          "vm.io.write_ops",
-                         "vm.io.write_ops_sec",
-                         "disk.inode_used_perc",
-                         "disk.space_used_perc",
-                         "disk.total_space_mb",
-                         "disk.total_used_space_mb",
-                         "io.read_kbytes_sec",
-                         "io.read_req_sec",
-                         "io.read_time_sec",
-                         "io.write_kbytes_sec",
-                         "io.write_req_sec",
-                         "io.write_time_sec",
-                         "vm.disk.inode_used_perc",
-                         "vm.disk.space_used_perc",
-                         "vm.disk.total_space_mb",
-                         "vm.disk.total_used_space_mb",
-                         "vm.io.read_kbytes_sec",
-                         "vm.io.read_req_sec",
-                         "vm.io.read_time_sec",
-                         "vm.io.write_kbytes_sec",
-                         "vm.io.write_req_sec",
-                         "vm.io.write_time_sec"]
+                         "vm.io.write_ops_sec"]
     # 32 * 3 = 96
     vswitch_metric_names = ["vm.vswitch.in_bytes",
                             "vm.vswitch.in_bytes_sec",
@@ -253,7 +182,7 @@ class vmSimulator(object):
                             "vswitch.out_dropped_sec",
                             "vswitch.out_errors",
                             "vswitch.out_errors_sec"]
-    # 16*2=32
+    # 16
     network_metric_names = ["net.in_bytes",
                             "net.in_bytes_sec",
                             "net.in_packets",
@@ -313,20 +242,6 @@ class vmSimulator(object):
 
     def preload_metrics(self):
         for name in vmSimulator.metric_names:
-            dimensions = self.base_dimensions.copy()
-            tenant_id = self.vm_tenant_id
-
-            if name.startswith('vm.'):
-                dimensions['tenant_id'] = self.vm_tenant_id
-                tenant_id = self.admin_tenant_id
-
-            metric_id = add_full_definition(name=name,
-                                            dimensions=dimensions,
-                                            tenant_id=tenant_id,
-                                            region=REGION)
-            self.metric_ids.add(metric_id)
-
-        for name in vmSimulator.process_metric_names:
             dimensions = self.base_dimensions.copy()
             tenant_id = self.vm_tenant_id
 
