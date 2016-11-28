@@ -1,9 +1,12 @@
+import os
 import random
 import socket
 import sys
 import time
 import multiprocessing
 import argparse
+import uuid
+
 import yaml
 
 
@@ -15,8 +18,9 @@ from monascaclient import exc
 
 wait_time = 30
 
-number_of_metrics = 1310
-
+number_of_agents = int(os.environ.get('NUM_AGENTS', '0'))
+number_of_containers = int(os.environ.get('NUM_CONTAINERS', '10'))
+number_of_metrics = int(os.environ.get('NUM_METRICS', '1310'))
 
 
 class AgentInfo:
@@ -47,14 +51,10 @@ def get_token(keystone):
     return ks_client.token
 
 
-
-
-def create_metric_list(process_number):
-
-
+def create_metric_list(process_number, container_names):
     metrics = []
     for i in xrange(number_of_metrics):
-        epoch = (int)(time.time()) - 120
+        epoch = int(time.time()) - 120
         metrics.append({"name": "perf-parallel-" + str(i),
                         "dimensions": {"perf-id": str(process_number),
                                        "zone": "nova",
@@ -65,7 +65,8 @@ def create_metric_list(process_number):
                                        "component": "vm",
                                        "control_plane": "ccp",
                                        "cluster": "compute",
-                                       "cloud_name": "monasca"},
+                                       "cloud_name": "monasca",
+                                       "container": container_names[i % len(container_names)]},
                         "timestamp": epoch * 1000,
                         "value": i})
 
@@ -83,8 +84,9 @@ def create_metric_list(process_number):
     return metrics
 
 
-
 def send_metrics(agent_info, process_number):
+    container_names = [uuid.uuid4().hex for i in range(number_of_containers)]
+
     time.sleep(random.randint(0, 60))
     token = get_token(agent_info.keystone)
     if token is None:
@@ -93,7 +95,7 @@ def send_metrics(agent_info, process_number):
         try:
             mon_client = client.Client('2_0', agent_info.monasca_url, token=token)
             start_send = time.time()
-            metrics = create_metric_list(process_number)
+            metrics = create_metric_list(process_number, container_names)
             mon_client.metrics.create(jsonbody=metrics)
             end_send = time.time()
             secs = end_send - start_send
@@ -116,7 +118,7 @@ def parse_agent_config(agent_info):
 
 def agent_simulator_test():
     args = parse_args()
-    num_processes = args.number_agents
+    num_processes = number_of_agents or args.number_agents
     agent_info = AgentInfo()
     parse_agent_config(agent_info)
     process_list = []
