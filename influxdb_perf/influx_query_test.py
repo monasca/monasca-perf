@@ -118,7 +118,6 @@ def main():
     status_output(r, delta_time)
 
 
-
 def run_query(query_param):
     query_url = 'http://localhost:8086/query?db=monasca'
     start_time = time.time()
