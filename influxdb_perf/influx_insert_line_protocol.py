@@ -50,8 +50,9 @@ def main(host='localhost', port=8086, client_num=1):
 
     # INSERT
     print "Write points: batch_size = {0}".format(NUMBER_PER_BATCH)
-    start_time = datetime.datetime.utcnow()
-    print "Start time: {0}".format(start_time)
+    start_timestamp = datetime.datetime.utcnow()
+    print "Start time: {0}".format(start_timestamp)
+    start_time = time.time()
 
     dimension_keys_values_map = {'service': 'monitoring', 'host': 'localhost',
                                  'cloud': 'cloud_test'}
@@ -60,16 +61,14 @@ def main(host='localhost', port=8086, client_num=1):
 
     metric_count = 0
     metric_name_dict = defaultdict(int)
-    base_timestamp = datetime.datetime.utcnow() - datetime.timedelta(days=45)
-    base_datetime = time.mktime(base_timestamp.timetuple())
+    base_datetime = time.time()
 
-    for i in xrange(NUMBER_OF_MEASUREMENTS / NUMBER_PER_BATCH): # 400
+    for i in xrange(NUMBER_OF_MEASUREMENTS / NUMBER_PER_BATCH):
         batch_set = []
-        for j in xrange(NUMBER_PER_BATCH): # 5000
+        for j in xrange(NUMBER_PER_BATCH):
             # make sure in each batch,
             # all the measurements have different metric name and timestamp
-            timestamp = str(int(base_datetime * 1000 + i * NUMBER_PER_BATCH
-                                + j))
+            timestamp = int((base_datetime * 1000000000 + i * NUMBER_PER_BATCH + j))
             metric_name = 'metric_KS_{0}_{1}'.format(client_num, j)
             metric_name_dict[metric_name] += 1
             value = i * NUMBER_PER_BATCH + j
@@ -86,19 +85,16 @@ def main(host='localhost', port=8086, client_num=1):
                         'metric_id="{3}" {4}'.format(metric_name, host_name,
                                                      value, str(metric_id),
                                                      timestamp)
-            print "line_body = {}".format(line_body)
             batch_set.append(line_body)
             metric_count += 1
-        client.write_points(batch_set, batch_size=NUMBER_PER_BATCH,
-                            time_precision='ms', protocol='line')
-    end_time = datetime.datetime.utcnow()
+        client.write_points(batch_set, batch_size=NUMBER_PER_BATCH, protocol='line')
+    end_time = time.time()
     elapsed = end_time - start_time
     if running_recording:
         os.kill(top_process.pid, 9)
     # Calculate Insert Rate
     print "elapsed time: {0}".format(str(elapsed))
-    print "measurements per sec: {0}".format(str(float(NUMBER_OF_MEASUREMENTS) / elapsed.seconds))
-    print "metric_name_dict = {}".format(metric_name_dict)
+    print "measurements per sec: {0}".format(str(float(NUMBER_OF_MEASUREMENTS) / elapsed))
 
 
 def parse_args():
