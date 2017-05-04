@@ -12,6 +12,9 @@ from monascaclient import ksclient
 from monascaclient import client
 import yaml
 
+# path to the monasca-agent configuration file
+AGENT_CONF_PATH = '/etc/monasca/agent/agent.yaml'
+
 # keystone data to get a token. Can be set manually
 # or read from the agent.yaml config file
 keystone = {
@@ -23,12 +26,6 @@ keystone = {
 
 # Run as "python agent_simulator.py
 
-RNDD_KAFKA0002 = 'http://127.0.0.1:8080/v2.0/metrics'
-MINI_MON = 'http://192.168.10.4:8080/v2.0/'
-
-# select which API URL to use
-api_url = MINI_MON
-
 log = logging.getLogger(__name__)
 
 
@@ -38,8 +35,7 @@ exiting = False
 
 def _get_agent_conf():
     """ get the monasca agent config"""
-    agent_conf_path = '/etc/monasca/agent/agent.yaml'
-    with open(agent_conf_path, 'r') as ac:
+    with open(AGENT_CONF_PATH, 'r') as ac:
         return yaml.load(ac.read())
 
 
@@ -58,7 +54,6 @@ def _get_monasca_api_url_from_agent_conf():
     return ac['Api']['url']
 
 keystone = _get_keystone_from_agent_conf()
-api_url = _get_monasca_api_url_from_agent_conf()
 
 
 class MetricCreatorSimple():
@@ -198,6 +193,10 @@ def parse_args():
     parser.add_argument('--interval', type=int, default=60,
                         help='The seconds to wait to send metrics. '
                         '(default: %(default)s)')
+    parser.add_argument('--monasca-api-url', type=str, default=None,
+                        help='The url to the monasca-api. If None, will be '
+                        'autodetected from agent.yaml config. '
+                        '(default: %(default)s)')
 
     return parser.parse_args()
 
@@ -206,6 +205,11 @@ if __name__ == '__main__':
     args = parse_args()
     print ("total metrics sent (per interval) = %d" % (args.processes * args.requests * args.metrics_per_request))
     print ("total connections (per interval) = %d" % (args.processes * args.requests))
+
+    if args.monasca_api_url:
+        api_url = args.monasca_api_url
+    else:
+        api_url = _get_monasca_api_url_from_agent_conf()
 
     for x in xrange(0, args.processes):
         p = multiprocessing.Process(
