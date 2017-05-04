@@ -1,3 +1,4 @@
+import argparse
 from urlparse import urlparse
 import httplib, sys, multiprocessing
 import os
@@ -27,23 +28,6 @@ MINI_MON = 'http://192.168.10.4:8080/v2.0/'
 
 # select which API URL to use
 api_url = MINI_MON
-
-# num_process x num_requests will be the number of http connections.  
-# beware that 20,000 connections will cause too many ephemeral ports used
-# on a single api server (with one ipaddress).  Would recommend not greater than 1000
-num_processes = 1
-
-# number of requests sent per interval (normally 1-20 max if doing continuous)
-num_requests = 2
-
-# the agent sends anywhere between 40-360 metrics per request
-num_metrics_per_request = 100
-
-# (for continuous) The seconds to wait to send metrics. valid range 1-60 (lowest recommended is 10 by the agent)
-agent_interval = 60
-
-# when False runs once, when True runs continuously sending num_requests every interval.
-continuous = False
 
 log = logging.getLogger(__name__)
 
@@ -94,26 +78,19 @@ class MetricCreatorSimple():
         return metric
 
 class agent_sim_process():
-    """Simulate a monasca agent
-        arguments
-            proc_num - identifying number for the agent
-            num_requests - how many requests the agent makes per interval
-            num_metrics - how many metrics are in each request
-            continuous - run once or forever
-            queue - (multiprocessing.Queue) if provided, agent will use to report number of metrics sent
-            metric_creator - agent will call "create_metric" method from this object and will pass in proc_num
-            token - what token should the agent use, will generate its own token if none provided
-
-        The process will report the number of metrics for each batch request to the q, it will also send exceptions
-        it encounters. If no queue is provided, it will print these instead.
     """
-    def __init__(self, proc_num, num_requests, num_metrics, api_url, keystone_dict, continuous=False, interval=60, queue=None,
+    Simulate a monasca agent
+    The process will report the number of metrics for each batch request to
+    the q, it will also send exceptions it encounters. If no queue is provided,
+    it will print these instead.
+    """
+    def __init__(self, proc_num, args, api_url, keystone_dict, queue=None,
                  metric_creator=MetricCreatorSimple, token=None):
         self.proc_num = proc_num
-        self.num_requests = num_requests
-        self.num_metrics = num_metrics
-        self.interval = interval
-        self.continuous = continuous
+        self.num_requests = args.requests
+        self.num_metrics = args.metrics_per_request
+        self.interval = args.interval
+        self.continuous = args.continuous
         self.queue = queue
         if not token:
             try:
@@ -203,21 +180,36 @@ def clean_exit(signum, frame=None):
     sys.exit(0)
 
 
-if __name__ == '__main__':
-    print ("continuous = %d") % continuous
-    print ("using URL: %s") % api_url
-    print ("num_process = %d" % num_processes)
-    print ("num_metrics_per_request = %d" % num_metrics_per_request)
-    print ("num requests (sent per interval if continuous) = %d") % num_requests
-    print ("interval (secs) = %d" % agent_interval)
-    print ("total metrics sent (per interval) = %d" % (num_processes * num_requests * num_metrics_per_request))
-    print ("total connections (per interval) = %d" % (num_processes * num_requests))
+def parse_args():
+    """parse command line arguments"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--continuous', action='store_true',
+                        help='Run in continuous mode (default: %(default)s)')
+    parser.add_argument('--processes', type=int, default=1,
+                        help='Number of processes. processes*requsts='
+                        'the number of http connections (default: %(default)s)')
+    parser.add_argument('--metrics-per-request', type=int, default=100,
+                        help='Number of metrics per request '
+                        '(default: %(default)s)')
+    parser.add_argument('--requests', type=int, default=2,
+                        help='Number of requests sent per interval. '
+                        'processes*requsts=the number of http connections. '
+                        '(default: %(default)s)')
+    parser.add_argument('--interval', type=int, default=60,
+                        help='The seconds to wait to send metrics. '
+                        '(default: %(default)s)')
 
-    log.info('num_processes %d', num_processes)
-    for x in xrange(0, num_processes):       
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    print ("total metrics sent (per interval) = %d" % (args.processes * args.requests * args.metrics_per_request))
+    print ("total connections (per interval) = %d" % (args.processes * args.requests))
+
+    for x in xrange(0, args.processes):
         p = multiprocessing.Process(
-            target=agent_sim_process(x, num_requests, num_metrics_per_request, api_url,
-                                     keystone, continuous, agent_interval).run
+            target=agent_sim_process(x, args, api_url, keystone).run
         )
         processors.append(p)
 
