@@ -9,7 +9,10 @@ import logging
 import logging.config
 from monascaclient import ksclient
 from monascaclient import client
+import yaml
 
+# keystone data to get a token. Can be set manually
+# or read from the agent.yaml config file
 keystone = {
     'username': 'mini-mon',
     'password': 'password',
@@ -47,6 +50,32 @@ log = logging.getLogger(__name__)
 
 processors = []  # global list to facilitate clean signal handling
 exiting = False
+
+
+def _get_agent_conf():
+    """ get the monasca agent config"""
+    agent_conf_path = '/etc/monasca/agent/agent.yaml'
+    with open(agent_conf_path, 'r') as ac:
+        return yaml.load(ac.read())
+
+
+def _get_keystone_from_agent_conf():
+    ac = _get_agent_conf()
+    return {
+        'username': ac['Api']['username'],
+        'password': ac['Api']['password'],
+        'project': ac['Api']['project_name'],
+        'auth_url': ac['Api']['keystone_url'],
+    }
+
+
+def _get_monasca_api_url_from_agent_conf():
+    ac = _get_agent_conf()
+    return ac['Api']['url']
+
+keystone = _get_keystone_from_agent_conf()
+api_url = _get_monasca_api_url_from_agent_conf()
+
 
 class MetricCreatorSimple():
     """ Generates metrics
