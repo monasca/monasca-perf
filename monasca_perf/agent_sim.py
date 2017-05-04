@@ -187,8 +187,8 @@ if __name__ == '__main__':
     log.info('num_processes %d', num_processes)
     for x in xrange(0, num_processes):       
         p = multiprocessing.Process(
-            target=agent_sim_process(x, num_requests, num_metrics_per_request, api_url, continuous,
-                                     keystone, agent_interval).run
+            target=agent_sim_process(x, num_requests, num_metrics_per_request, api_url,
+                                     keystone, continuous, agent_interval).run
         )
         processors.append(p)
 
