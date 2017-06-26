@@ -40,11 +40,13 @@ if not os.path.exists(args[0]):
 #
 # Run the agent simulator and see how long it takes the persister to process all of the metrics.
 # Since the persister may take up to 15 seconds to flush the last batch, this is not the true
-# speed, but is close enough for comparisons
+# speed, but is close enough for comparisons.
+# There should be no agents running, that will make the test less accurate
 #
 n, starting_measurements = get_num_metrics_left()
 if n != 0:
-    print('''Persister is already lagging {} metrics, can't run test'''.format(n), file=sys.stderr)
+    print('''Persister is already lagging {} metrics, can't run test. Ensure agents are OFF!'''.format(n),
+          file=sys.stderr)
     sys.exit(1)
 
 start_time = time.time()
