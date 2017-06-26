@@ -18,6 +18,8 @@ from monascaclient import exc
 
 wait_time = 30
 
+no_wait = False
+
 number_of_agents = int(os.environ.get('NUM_AGENTS', '0'))
 number_of_containers = int(os.environ.get('NUM_CONTAINERS', '10'))
 number_of_metrics = int(os.environ.get('NUM_METRICS', '1310'))
@@ -39,6 +41,7 @@ def parse_args():
     parser.add_argument("--run_time",
                         help="How long, in mins, collection will run. Defaults to run indefinitely until the user hits"
                              " control c", required=False, type=int, default=None)
+    parser.add_argument("--no_wait", help="Send measurements as fast as possible", action="store_true")
     return parser.parse_args()
 
 
@@ -87,7 +90,8 @@ def create_metric_list(process_number, container_names):
 def send_metrics(agent_info, process_number):
     container_names = [uuid.uuid4().hex for i in range(number_of_containers)]
 
-    time.sleep(random.randint(0, 60))
+    if not no_wait:
+        time.sleep(random.randint(0, 60))
     token = get_token(agent_info.keystone)
     if token is None:
         return
@@ -99,7 +103,8 @@ def send_metrics(agent_info, process_number):
             mon_client.metrics.create(jsonbody=metrics)
             end_send = time.time()
             secs = end_send - start_send
-            time.sleep(wait_time-secs)
+            if not no_wait:
+                time.sleep(wait_time-secs)
         except KeyboardInterrupt:
             return
         except exc.HTTPUnauthorized:
@@ -107,7 +112,7 @@ def send_metrics(agent_info, process_number):
 
 
 def parse_agent_config(agent_info):
-    agent_config_file = open('/etc/monasca/agent/agent.yaml')
+    agent_config_file = open('agent.yaml')
     agent_config = yaml.load(agent_config_file)
     agent_info.keystone['username'] = agent_config['Api']['username']
     agent_info.keystone['password'] = agent_config['Api']['password']
@@ -117,7 +122,9 @@ def parse_agent_config(agent_info):
 
 
 def agent_simulator_test():
+    global no_wait
     args = parse_args()
+    no_wait = args.no_wait
     num_processes = number_of_agents or args.number_agents
     agent_info = AgentInfo()
     parse_agent_config(agent_info)
