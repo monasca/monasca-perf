@@ -112,7 +112,7 @@ def send_metrics(agent_info, process_number):
 
 
 def parse_agent_config(agent_info):
-    agent_config_file = open('agent.yaml')
+    agent_config_file = open('/etc/monasca/agent/agent.yaml')
     agent_config = yaml.load(agent_config_file)
     agent_info.keystone['username'] = agent_config['Api']['username']
     agent_info.keystone['password'] = agent_config['Api']['password']
