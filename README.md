@@ -1,3 +1,6 @@
+# Tools and investigation results, regarding performance in Monasca:
+
+
 monasca-perf
 ============
 
@@ -33,3 +36,10 @@ Performance evaluation tools:
 analyze_persister.py - Queries the Monasca Java Persister metrics endpoint to print a summary of persister activity
 
   python analyze_persister.py
+
+
+kafka_client_perf_results
+=========================
+
+Comparison of throughput with different kafka Python clients:
+Investigation results and tools
