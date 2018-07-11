@@ -50,6 +50,15 @@ Otherwise, errors will occur, and the test will finally fail and abort.
   * help: displays a help text about the options described above
   * The program assumes that kafka and zookeeper can be accessed on 127.0.0.1:9092 resp. 127.0.0.1:2181. If this doesn't apply in your case, the program needs to be adopted.
 
+  _Note: In a docker-environment, the easiest way to achieve this to expose the default ports for both containers:
+  In the relevant docker-compose file (e.g. docker-compose.yml), add the following lines to kafka resp. zookeeper service:_
+
+    ports:  
+      \- "host-port:container-port",  
+    e.g. for zookeeper:
+        "2181:2181"
+
+
 # Program description
 
 Basically, the program executes the following steps for the clients specified:

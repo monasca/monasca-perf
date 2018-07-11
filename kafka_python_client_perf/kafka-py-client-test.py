@@ -16,6 +16,7 @@ from abc import ABCMeta, abstractmethod
 msg_count = 100000
 kafka_host = "127.0.0.1:9092"
 zookeeper_host = "127.0.0.1:2181"
+topic_name = "tst-pykafka"
 
 def confluentAck(err, msg):
 
@@ -23,6 +24,14 @@ def confluentAck(err, msg):
         print "Failed to deliver message: {}: {}".format(msg, err)
 #   else:
 #       print "Message produced: {}".format(msg)
+
+
+def checkTopic(topic):
+    client = KafkaClient(hosts=kafka_host)
+    topicList = client.topics
+#   if topic not in topicList:
+    if topic not in client.topics:
+       return False
 
 
 class PythonClient:
@@ -99,7 +108,7 @@ class PythonClient:
 
 
 class KafkaPythonClient(PythonClient):
-    def __init__(self,topic="tst-pykafka",kafkaHost = kafka_host, zookeeperHost=zookeeper_host):
+    def __init__(self,topic=topic_name, kafkaHost = kafka_host, zookeeperHost=zookeeper_host):
         self.config["topic"] = topic
         self.config["kafkaHost"] = kafkaHost
         self.config["zookeeperHost"] = zookeeperHost
@@ -160,7 +169,7 @@ class KafkaPythonClient(PythonClient):
 
 
 class KafkaPythonClientSimple(PythonClient):
-    def __init__(self,topic="tst-pykafka", consumerGroup="perftest", kafkaHost=kafka_host, zookeeperHost=zookeeper_host):
+    def __init__(self,topic=topic_name, consumerGroup="perftest", kafkaHost=kafka_host, zookeeperHost=zookeeper_host):
         self.config["topic"] = topic
         self.config["kafkaHost"] = kafkaHost
         self.config["zookeeperHost"] = zookeeperHost
@@ -226,7 +235,7 @@ class KafkaPythonClientSimple(PythonClient):
 
 
 class PyKafkaClient(PythonClient):
-    def __init__(self,topic="tst-pykafka", consumerGroup="perftest", kafkaHost=kafka_host, zookeeperHost=zookeeper_host):
+    def __init__(self,topic=topic_name, consumerGroup="perftest", kafkaHost=kafka_host, zookeeperHost=zookeeper_host):
         self.config["topic"] = topic
         self.config["kafkaHost"] = kafkaHost
         self.config["zookeeperHost"] = zookeeperHost
@@ -235,19 +244,18 @@ class PyKafkaClient(PythonClient):
         self.topic = self.client.topics[self.config["topic"]]
         super(PyKafkaClient, self).__init__()
 
-    def createProducer(self, kafkaSync, use_rdkafka, min_queued_messages, msgSync):
+    def createProducer(self, kafkaSync, use_rdkafka, min_queued_messages, linger_ms=5000):
         self.config["kafkaSync"] = kafkaSync
-        if self.config["kafkaSync"] == True:
-            self.producer = self.topic.get_sync_producer()
-        else:
-            self.producer = self.topic.get_producer(use_rdkafka=use_rdkafka, min_queued_messages=min_queued_messages, sync=msgSync)
+        self.producer = self.topic.get_producer(use_rdkafka=use_rdkafka, min_queued_messages=min_queued_messages, sync=kafkaSync, linger_ms=linger_ms)
 
     def createConsumer(self,consumerMode, use_rdkafka):
-        # TBD: pass options as params
 
         if consumerMode == "simple":
+            # if queued_max_messages hasn't been set, a lidrfkafka error will occur (value set to default: 2000)
             self.consumer = self.topic.get_simple_consumer(consumer_group=self.config["consumerGroup"],
-                                auto_commit_enable = False,
+                                queued_max_messages=2000,
+#                               auto_commit_enable = False,
+                                auto_commit_enable = True,
                                 use_rdkafka = use_rdkafka,
                                 consumer_timeout_ms=1000)
         elif consumerMode == "balanced":
@@ -262,10 +270,13 @@ class PyKafkaClient(PythonClient):
 
     def produce(self, num_msg=20000):
         self.msgCount = num_msg
+        progressCount = 10000
+        if num_msg < progressCount:
+           progressCount = num_msg/10
         for x in range (self.msgCount):
-            self.prtProgress(x, 10000)
+            self.prtProgress(x, progressCount)
             self.producer.produce(self.msg)
-        if (x >= 10000):
+        if x >= progressCount:
             sys.stdout.write('\n')
 
     def consume(self, num_msg):
@@ -300,7 +311,7 @@ class PyKafkaClient(PythonClient):
 
 
 class ConfluentClient(PythonClient):
-    def __init__(self,topic="tst-pykafka",kafkaHost = kafka_host, zookeeperHost=zookeeper_host):
+    def __init__(self,topic=topic_name,kafkaHost = kafka_host, zookeeperHost=zookeeper_host):
         self.config["topic"] = topic
         self.config["kafkaHost"] = kafkaHost
         self.config["zookeeperHost"] = zookeeperHost
@@ -389,14 +400,18 @@ class ConfluentClient(PythonClient):
     def stopConsumer(self): pass
     def finalize(self): pass
 
-def producerPerfTest(results, api="pykafka", topic = "tst-pykafka",  num_msg = 20000, kafkaSync = False,
+def producerPerfTest(results, api="pykafka", topic = topic_name, num_msg = 20000, kafkaSync = False,
     useCLib = True, kafkaHost = kafka_host, zookeeperHost=zookeeper_host, msgLen = 100,
-    min_queued_messages = 5000, sync=False, consumerMode = ""):
+    min_queued_messages = 5000, consumerMode = "", linger_ms=-1):
 
     if api == "pykafka":
-        strConfig = "sync(API): {}, C-lib: {}, min_queued_msg: {}, cons.mode: {}, sync(async+wait): {}".format(kafkaSync, useCLib, min_queued_messages,consumerMode, sync)
+        strConfig = "sync(API): {}, C-lib: {}, min_queued_msg: {}, cons.mode: {}):".format(kafkaSync, useCLib, min_queued_messages,consumerMode)
         testObj = PyKafkaClient(topic=topic,kafkaHost=kafkaHost, zookeeperHost=zookeeperHost)
-        testObj.createProducer(kafkaSync=kafkaSync, use_rdkafka=useCLib,min_queued_messages=min_queued_messages, msgSync=sync)
+        if linger_ms < 0:
+            testObj.createProducer(kafkaSync=kafkaSync, use_rdkafka=useCLib,min_queued_messages=min_queued_messages)
+        else:
+            strConfig += ", linger_ms: {}".format(linger_ms)
+            testObj.createProducer(kafkaSync=kafkaSync, use_rdkafka=useCLib,min_queued_messages=min_queued_messages, linger_ms=linger_ms)
         testObj.createConsumer(consumerMode, use_rdkafka=useCLib)
     elif api == "kafka-python":
         strConfig = "sync: {}".format(kafkaSync)
@@ -427,10 +442,14 @@ def producerPerfTest(results, api="pykafka", topic = "tst-pykafka",  num_msg = 2
 
     print "    Warm up"
     # warm up before measurement
-    testObj.produce(num_msg=1000)
+    if num_msg >= 10000:
+       num_warmup_msg = 1000
+    else:
+       num_warmup_msg = num_msg/10
+    testObj.produce(num_msg=num_warmup_msg)
     testObj.stopProducer()
     # consume warm up messages
-    testObj.consume(1000)
+    testObj.consume(num_warmup_msg)
 
     print "    Start Test"
     testObj.startProducer()
@@ -441,6 +460,7 @@ def producerPerfTest(results, api="pykafka", topic = "tst-pykafka",  num_msg = 2
     print "    Producer Test completed"
 
     # sleep 30 seconds to ensure that system doesn't have any more activities before starting consumer test
+    print "    sleep 30 seconds"
     time.sleep(30)
 
     startTime = time.time()
@@ -458,9 +478,9 @@ def producerPerfTest(results, api="pykafka", topic = "tst-pykafka",  num_msg = 2
 
 def main():
     resultArr = []
-    topic = "tst-pykafka"
-    kafkaHost = "127.0.0.1:9092"
-    zookeeperHost = "127.0.0.1:2181"
+    topic = topic_name
+    kafkaHost = kafka_host
+    zookeeperHost = zookeeper_host
     min_queued_messages = 1000
     msgLen = 100
 
@@ -469,6 +489,11 @@ def main():
     kafka_python = False
     kafka_python_simple = False
 
+    if checkTopic(topic) == False:
+        print "Error: topic {} does not exist in kafka, pls. create the topic before starting the test".format(topic)
+        sys.exit()
+
+       
     # read parameters if any:
     parser = argparse.ArgumentParser(description="Performance test for sev. kafka clients in Python")
     parser.add_argument("--kafkaCli", type=str, choices=["all","confluent", "pykafka", "kafka_python", "kafka_python_simple"])
@@ -575,20 +600,35 @@ def main():
         producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=100000, kafkaSync=False, useCLib=False,
             kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, consumerMode=consumerMode)
 
-        print "### 1.5.: pykafka, async, without cLib, 1000 queued messages, sync=True"
-        resultArr.append(resultEle.copy())
-        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=2000, kafkaSync=False, useCLib=False,
-            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, sync=True, consumerMode=consumerMode)
-
-        print "### 1.6: pykafka, async, with cLib, 1000 queued messages, sync=True"
-        resultArr.append(resultEle.copy())
-        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=500, kafkaSync=False, useCLib=True,
-            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, sync=True, consumerMode=consumerMode)
-
-        print "### 1.7.: pykafka, sync, no cLib, 1000 queued messages"
+        print "### 1.5.: pykafka, sync, without cLib, 1000 queued messages"
         resultArr.append(resultEle.copy())
         producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=2000, kafkaSync=True, useCLib=False,
             kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, consumerMode=consumerMode)
+
+        print "### 1.6: pykafka, sync, with cLib, 1000 queued messages"
+        resultArr.append(resultEle.copy())
+        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=250, kafkaSync=True, useCLib=True,
+            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, consumerMode=consumerMode)
+
+        print "### 1.8.: pykafka, sync, without cLib, 1000 queued messages, linger_ms=0"
+        resultArr.append(resultEle.copy())
+        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=2000, kafkaSync=True, useCLib=False,
+            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, consumerMode=consumerMode, linger_ms=0)
+
+        print "### 1.9: pykafka, sync, with cLib, 1000 queued messages, linger_ms=0"
+        resultArr.append(resultEle.copy())
+        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=2000, kafkaSync=True, useCLib=True,
+            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=min_queued_messages, consumerMode=consumerMode, linger_ms=0)
+
+        print "### 1.10.: pykafka, sync, without cLib, 1 queued messages, linger_ms=0"
+        resultArr.append(resultEle.copy())
+        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=2000, kafkaSync=True, useCLib=False,
+            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=1, consumerMode=consumerMode, linger_ms=0)
+
+        print "### 1.11: pykafka, sync, with cLib, 1 queued messages, linger_ms=0"
+        resultArr.append(resultEle.copy())
+        producerPerfTest(resultArr[-1], api="pykafka", topic=topic, num_msg=2000, kafkaSync=True, useCLib=True,
+            kafkaHost=kafkaHost, zookeeperHost=zookeeperHost, msgLen=msgLen, min_queued_messages=1, consumerMode=consumerMode, linger_ms=0)
 
     if kafka_python == True:
         print "### 2.1.: kafka-python new, async"

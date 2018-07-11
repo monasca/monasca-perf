@@ -1,12 +1,15 @@
 **Investigation: Performance of different python-API’s for Kafka**
 
-Last update: 2018/07/02
+Last update: 2018/07/10
 
 Created: 2018/05/22
 
-Version: 1.5
+Version: 1.7
 
 Author: M. Bandorf
+
+**  
+**
 
 **Change Log**
 
@@ -22,13 +25,26 @@ Author: M. Bandorf
 </thead>
 <tbody>
 <tr class="odd">
-<td></td>
-<td></td>
-<td></td>
-<td></td>
-<td></td>
+<td>2018/07/10</td>
+<td>M. Bandorf</td>
+<td>1.7</td>
+<td><p>1.3</p>
+<p>2.2</p>
+<p>2.4,2.6</p>
+<p>3</p></td>
+<td><p>Added: info about version of librdkafka</p>
+<p>Reworked: new measurements w. later version of librdkafka, changed params</p>
+<p>Adjust table</p>
+<p>Summary: Slightly enhanced</p></td>
 </tr>
 <tr class="even">
+<td>2018/07/05</td>
+<td>M. Bandorf</td>
+<td>1.6</td>
+<td>1.3</td>
+<td>Add version info for librdkafka</td>
+</tr>
+<tr class="odd">
 <td>2018/07/02</td>
 <td>M. Bandorf</td>
 <td>1.5</td>
@@ -36,7 +52,7 @@ Author: M. Bandorf
 <td><p>Deleted: code sample</p>
 <p>Added: link to test-code</p></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>2018/06/26</td>
 <td>M. Bandorf</td>
 <td>1.4</td>
@@ -47,7 +63,7 @@ Author: M. Bandorf
 <li><p>Replace xls-based charts by images</p></li>
 </ul></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>2018/06/21</td>
 <td>M. Bandorf</td>
 <td>1.3</td>
@@ -59,14 +75,14 @@ Author: M. Bandorf
 <li><p>Better throughput f. kafka-python, simple consumer</p></li>
 </ul></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>2018/06/21</td>
 <td>M. Bandorf</td>
 <td>1.2</td>
 <td></td>
 <td>Distributed for review</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>2018/06/20</td>
 <td>M. Bandorf</td>
 <td>1.2</td>
@@ -81,14 +97,14 @@ Author: M. Bandorf
 </ul>
 <p>Reworked</p></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>2018/06/20</td>
 <td>M. Bandorf</td>
 <td>1.1</td>
 <td></td>
 <td>Distributed for review</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>2018/06/19</td>
 <td>M. Bandorf</td>
 <td>1.1</td>
@@ -135,19 +151,19 @@ Table of Contents
 
 [2.3 Test results for kafka 0.9 11](#test-results-for-kafka-0.9)
 
-[2.4 Quick overview of results (kafka 1.1 only) 13](#quick-overview-of-results-kafka-1.1-only)
+[2.4 Quick overview of results (kafka 1.1 only) 12](#quick-overview-of-results-kafka-1.1-only)
 
-[2.5 Comparison of kafka 0.9 &lt;-&gt; 1.1 13](#comparison-of-kafka-0.9---1.1)
+[2.5 Comparison of kafka 0.9 &lt;-&gt; 1.1 12](#comparison-of-kafka-0.9---1.1)
 
 [2.6 Reference to other performance comparisons 13](#reference-to-other-performance-comparisons)
 
-[3 Proposal 15](#proposal)
+[3 Proposal 14](#proposal)
 
-[4 Next steps 16](#next-steps)
+[4 Next steps 15](#next-steps)
 
-[5 Appendix 16](#appendix)
+[5 Appendix 15](#appendix)
 
-[5.1 Python test code 16](#python-test-code)
+[5.1 Python test code 15](#python-test-code)
 
 Introduction
 ============
@@ -237,6 +253,8 @@ The following clients have been selected for further testing:
 
 -   Reference: kafka-python simple-client (Version: 1.4.2, API is DEPRECATED)
 
+C-library installed: librdkafka, Version 0.11.4
+
 Test Targets
 ------------
 
@@ -306,27 +324,30 @@ Test results for kafka 1.1
 
 ### Producer sync.
 
-<img src=".//media/image1.png" style="width:7.17708in;height:3.01389in" />
+<img src=".//media/image1.png" style="width:6.16042in;height:3.01389in" />
 
 **Observations and judgement**:
+
+-   **Pykafka**:
+
+    -   **E**xtremely low throughput
+
+    -   Parameters, that shouldn’t have an impact on throughput (linger\_ms) for a sync. producer, improve the throughput. Still pretty poor
+
+-   **Kafka-python**:  
+    Pretty poor throughput, app. 5-times worse than kafka-python-simple!
 
 -   **Kafka-python-simple**:  
     Throughput pretty good
 
 <!-- -->
 
--   **Kafka-python**:  
-    Pretty poor throughput, app. 5-times worse than kafka-python-simple!
-
--   **Pykafka**:  
-    In all tests with synchronized mode, pykafka shows extremely low throughput, factor &gt;=40 worse than kafka-python-simple, factor &gt;=10 worse than kafka-python
-
 -   **Confluent**:  
-    Again, confluent provides by far the best throughput, even factor 2 better than kafka-python-simple
+    Provides by far the best throughput, even factor 2 better than kafka-python-simple
 
 ### Producer async.
 
-<img src=".//media/image2.png" style="width:7.25in;height:3.00694in" />
+<img src=".//media/image2.png" style="width:6.12083in;height:3.01389in" />
 
 **Observations & Judgement**:
 
@@ -337,11 +358,11 @@ Test results for kafka 1.1
     With usage of C-library, the throughput is good
 
 -   **Confluent**:  
-    Very good throughput, at least 3.5 times better than any other client analyzed
+    Very good throughput, almost 5 times better than any other client analyzed
 
 ### Consumer
 
-<img src=".//media/image3.png" style="width:7.30208in;height:3.01389in" />
+<img src=".//media/image3.png" style="width:5.83403in;height:3.01389in" />
 
 **Observations & Judgement**:
 
@@ -356,14 +377,12 @@ Test results for kafka 1.1
 -   **Kafka-python**:  
     Reasonable throughput
 
--   **Pykafka**:.  
-    Usage of C-library has huge impact on throughput:  
-    o Without C-library: Reasonable throughput  
-    o Usage of C-library: Good throughput  
-    *Note:  
-    pykafka has been tested with one more additional option: simple &lt;-&gt; balanced:  
-    In balanced mode, balancing of consumers is done. However, this functionality is covered by kafka, from version 0.9.  
-    *
+-   **Pykafka**:  
+    pykafka does not show a good throughput in this series of measurements.  
+    ***Note**:  
+    In previous measurements (different version of librdkafka), the throughput was much higher when C-library has been used.  
+    I assume with special parameter settings this could be achieved again.  
+    Even in previous measurements, the throughput was anyway lower than kafka-python*
 
 -   **Confluent**:  
     Very good throughput: At least twice as high as with other clients
@@ -407,7 +426,7 @@ Test results for kafka 0.9
             Pretty poor throughput, appl. 5-times worse than kafka-python-simple!
 
         -   **Asynchronous**:  
-            Throughput significantly better than kafka-python-simple (nearly 2.5 times better). However, not extraordinary for async,
+            Throughput significantly better than kafka-python-simple (nearly 2.5 times better). However, not extraordinary for async.
 
 Quick overview of results (kafka 1.1 only)
 ------------------------------------------
@@ -447,7 +466,7 @@ Quick overview of results (kafka 1.1 only)
 <td>--</td>
 <td>C-lib: +<br />
 no C-lib: O</td>
-<td>C-lib: +<br />
+<td>C-lib: -<br />
 no C-lib: O</td>
 <td></td>
 </tr>
@@ -487,24 +506,30 @@ This benchmark compares the same Python kafka clients as those covered in this d
 
 Comparison of results:
 
-The measured throughput values can’t be compared: other versions, different hardware, …  
-However, the relation between these values would be a better measure for a comparison:
+The measured throughput values can’t be compared directly: other versions, different hardware, …  
+However, the relation between these values can be used as a measure for a comparison:
+
+The tables show the throughput:
+
+-   First number is the absolute throughput \[unit: msg/sec\]
+
+-   Second number (in brackets): Relative througfhput (relative to the base value)
+
+<!-- -->
 
 -   **Consumers**:
 
-| Test set   | Confluent | Pykafka (no C-lib) | Pykafka ( C-lib) | Kafka-python (used as base for rel. values) |          |          |          |          |
-|------------|-----------|--------------------|------------------|---------------------------------------------|----------|----------|----------|----------|
-|            | Absolute  | Relative           | Absolute         | Relative                                    | Absolute | Relative | Absolute | Relative |
-| Activision | 261408    | 6.94               | 33977            | 0.90                                        | 164312   | 4.36     | 37668    | 1        |
-| FEST       | 133986    | 3.0                | 30531            | 0.68                                        | 70537    | 1.58     | 44710    | 1        |
+| Test set   | Confluent     | Pykafka (no C-lib) | Pykafka ( C-lib) | Kafka-python (base) |
+|------------|---------------|--------------------|------------------|---------------------|
+| Activision | 261408 (6.94) | 33977 (0.90)       | 164312 (4.36)    | 37668 (1)           |
+| FEST       | 140291 (3.22) | 30368 (0.70)       | 10012 (0.23)     | 43617 (1)           |
 
 -   **Producers**:
 
-| Test set   | Confluent | Pykafka (no C-lib) | Pykafka ( C-lib) | Kafka-python (used as base for rel. values) |          |          |          |          |
-|------------|-----------|--------------------|------------------|---------------------------------------------|----------|----------|----------|----------|
-|            | Absolute  | Relative           | Absolute         | Relative                                    | Absolute | Relative | Absolute | Relative |
-| Activision | 183456    | 12.45              | 17446            | 1.18                                        | 63595    | 4.32     | 14737    | 1        |
-| FEST       | 528313    | 49.55              | 10552            | 0.99                                        | 138292   | 12.97    | 10663    | 1        |
+| Test set   | Confluent      | Pykafka (no C-lib) | Pykafka ( C-lib) | Kafka-python (base) |
+|------------|----------------|--------------------|------------------|---------------------|
+| Activision | 183456 (12.45) | 17446 (1.18)       | 63595 (4.32)     | 14737 (1)           |
+| FEST       | 389464 (37.93) | 9529 (0.93)        | 82294 (8.01)     | 10268 (1)           |
 
 **Judgement**:  
 In some cases, the factors differ quite a lot.  
@@ -575,6 +600,9 @@ Async. Handling needs to be implemented</td>
 </tbody>
 </table>
 
+**  
+**
+
 **Summary**:
 
 -   If the usage of a C-library is acceptable, Confluent client provides clearly the best throughput, no matter if producer is working synchronously or asynchronously.  
@@ -582,7 +610,13 @@ Async. Handling needs to be implemented</td>
 
     -   Migrate to confluent, use sync. Producer
 
-    -   Move to async. producer
+    -   Move to async. Producer
+
+-   Usage of pykafka with C-library librdkafka showed quite some issues:
+
+    -   Setting of parameters not as expected -&gt; “try and error”
+
+    -   Throughput improvements not as good as expected
 
 -   If no C-library shall be used, but asynchronous mode is OK, either pykafka or kafka-python can be used. Further investigation is required.
 
