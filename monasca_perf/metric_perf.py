@@ -3,8 +3,9 @@ import sys
 import time
 import multiprocessing
 
+from keystoneauth1 import identity
+from keystoneauth1 import session
 from monascaclient import client
-from monascaclient import ksclient
 
 from agent_sim import agent_sim_process
 
@@ -25,9 +26,9 @@ DISTINCT_METRICS = 20
 keystone = {
     'username': 'mini-mon',
     'password': 'password',
-    'project': 'test',
+    'project': 'mini-mon',
     #'auth_url': 'http://10.22.156.20:35358/v3',
-    'auth_url': 'http://192.168.10.5:35357/v3'
+    'auth_url': 'http://44.71.0.47/identity'
 }
 
 # monasca api urls
@@ -35,7 +36,7 @@ urls = [
     #'https://mon-ae1test-monasca01.useast.hpcloud.net:8080/v2.0',
     #'https://mon-ae1test-monasca02.useast.hpcloud.net:8080/v2.0',
     #'https://mon-ae1test-monasca03.useast.hpcloud.net:8080/v2.0',
-    'http://192.168.10.4:8080/v2.0',
+    'http://44.71.0.47/metrics/v2.0',
 ]
 
 if len(sys.argv) >= 2:
@@ -72,13 +73,17 @@ def aggregate_sent_metric_count(sent_q):
 
 def metric_performance_test():
 
-    try:
-        print('Authenticating with keystone on {}'.format(keystone['auth_url']))
-        ks_client = ksclient.KSClient(**keystone)
-    except Exception as ex:
-        return False, 'Failed to authenticate: {}'.format(ex)
+    auth = identity.Password(
+        auth_url=keystone['auth_url'],
+        username=keystone['username'],
+        password=keystone['password'],
+        project_name=keystone['project'],
+        user_domain_id='default',
+        project_domain_id='default'
+    )
+    sess = session.Session(auth=auth)
 
-    mon_client = client.Client('2_0', urls[0], token=ks_client.token)
+    mon_client = client.Client('2_0', urls[0], session=sess)
 
     sent_q = multiprocessing.Queue()
 
@@ -86,7 +91,8 @@ def metric_performance_test():
     for i in xrange(num_processes):
         p = multiprocessing.Process(target=agent_sim_process(i, num_requests, num_metrics, urls[(i % len(urls))],
                                                              keystone, queue=sent_q,
-                                                             metric_creator=MetricCreatorMetricPerf).run)
+                                                             metric_creator=MetricCreatorMetricPerf,
+                                                             token=sess).run)
         process_list.append(p)
 
     start_datetime = datetime.datetime.now()

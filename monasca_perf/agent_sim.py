@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 import logging
 import logging.config
-from monascaclient import ksclient
 from monascaclient import client
 
 keystone = {
@@ -92,7 +91,7 @@ class agent_sim_process():
             except Exception as ex:
                 print("Agent {}: Failed to get auth token from keystone\n{}".format(self.proc_num, keystone_dict))
         #print("Using token: " + token)
-        self.mon_client = client.Client('2_0', api_url, token=token)
+        self.mon_client = client.Client('2_0', api_url, session=token)
         self.metric_creator = metric_creator(proc_num)
         #print("Created agent {}".format(self.proc_num))
 
